@@ -1,0 +1,21 @@
+# Node / Next.js
+node_modules/
+.next/
+services/frontend/.next/
+npm-debug.log*
+
+# Environment files (contain credentials - never commit these)
+.env
+
+# Odoo runtime artifacts
+*.pyc
+__pycache__/
+services/odoo/filestore/
+services/odoo/sessions/
+services/odoo/logs/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

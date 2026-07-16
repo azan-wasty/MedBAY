@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_marketplace_admin" model="res.groups">
+        <field name="name">Marketplace Admin</field>
+        <field name="comment">
+            Can verify/reject buyer companies, upload product images, and
+            move RFQs into "quoted" state via the custom REST API.
+        </field>
+    </record>
+
+    <!-- Give it to the default admin user out of the box so you have
+         someone to test with immediately. Add other users to this group
+         through Settings > Users in the Odoo backend as needed. -->
+    <record id="base.user_admin" model="res.users">
+        <field name="groups_id" eval="[(4, ref('group_marketplace_admin'))]"/>
+    </record>
+</odoo>

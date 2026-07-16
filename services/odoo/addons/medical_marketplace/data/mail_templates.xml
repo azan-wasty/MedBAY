@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="email_template_rfq_quoted" model="mail.template">
+            <field name="name">RFQ Quoted Notification</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="subject">Your RFQ {{ object.name }} has been quoted</field>
+            <field name="email_from">{{ (object.company_id.email or user.email) }}</field>
+            <field name="email_to">{{ object.partner_id.email }}</field>
+            <field name="auto_delete" eval="False"/>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+                    <p>Dear {{ object.partner_id.name }},</p>
+                    <p>
+                        Your request for quotation <strong>{{ object.name }}</strong>
+                        has been reviewed and priced by our team.
+                    </p>
+                    <p>
+                        <strong>Total amount:</strong>
+                        {{ '%.2f' % object.amount_total }} {{ object.currency_id.symbol }}
+                    </p>
+                    <p>Please log in to your account to review the quotation and confirm the order.</p>
+                    <p>Thank you,<br/>The Marketplace Team</p>
+                </div>
+            </field>
+        </record>
+    </data>
+</odoo>

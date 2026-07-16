@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  odoo-db:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  odoo:
+    image: odoo:17.0
+    depends_on:
+      odoo-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      HOST: odoo-db
+      PORT: ${POSTGRES_PORT}
+      USER: ${POSTGRES_USER}
+      PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${ODOO_PORT:-8069}:8069"
+    volumes:
+      - ./services/odoo/addons:/mnt/extra-addons
+      - ./services/odoo/config/odoo.conf:/etc/odoo/odoo.conf
+      - odoo-web-data:/var/lib/odoo
+    command: >-
+      /bin/bash -c "
+      python3 -c \"import os; conf = open('/etc/odoo/odoo.conf').read(); conf = conf.replace('admin_passwd = changeme', 'admin_passwd = ' + os.getenv('ODOO_ADMIN_PASSWORD', '')); open('/tmp/odoo.conf', 'w').write(conf)\" &&
+      exec odoo -c /tmp/odoo.conf --db_host=odoo-db --db_port=${POSTGRES_PORT} -r ${POSTGRES_USER} -w ${POSTGRES_PASSWORD}
+      "
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+      target: development
+      args:
+        - PORT=${FRONTEND_PORT:-3000}
+    env_file:
+      - .env
+    ports:
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
+    volumes:
+      - ./services/frontend:/app
+      - /app/node_modules
+    depends_on:
+      - odoo
+
+volumes:
+  odoo-db-data:
+  odoo-web-data:

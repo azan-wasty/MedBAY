@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_template_only_form_view_medical" model="ir.ui.view">
+        <field name="name">product.template.product.form.medical</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='general_information']" position="inside">
+                <group string="Medical Equipment B2B Specs">
+                    <field name="certification_info"/>
+                    <field name="unit_of_measure"/>
+                    <field name="min_order_qty"/>
+                    <field name="warranty_period"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_form_medical" model="ir.ui.view">
+        <field name="name">res.partner.form.medical</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='vat']" position="after">
+                <field name="registration_number"/>
+                <field name="is_verified"/>
+                <field name="verification_status"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

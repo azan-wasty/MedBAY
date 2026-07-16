@@ -1,0 +1,46 @@
+from odoo import models, fields
+
+
+class ResPartnerVerification(models.Model):
+    """Adds company-verification fields to res.partner.
+
+    NOTE: this is a separate extension file from your existing
+    medical_partner.py on purpose, to avoid clobbering whatever fields
+    (e.g. registration_number) you already defined there. Odoo supports
+    multiple _inherit files against the same model — just make sure none
+    of the field names below already exist in medical_partner.py.
+    """
+    _inherit = 'res.partner'
+
+    verification_status = fields.Selection(
+        [
+            ('pending', 'Pending Review'),
+            ('verified', 'Verified'),
+            ('rejected', 'Rejected'),
+        ],
+        string='Verification Status',
+        default='pending',
+        index=True,
+        help='Only companies with status=verified may submit RFQs.',
+    )
+    verified_by = fields.Many2one('res.users', string='Verified By', readonly=True)
+    verification_date = fields.Datetime(string='Verification Date', readonly=True)
+    verification_notes = fields.Text(string='Verification / Rejection Notes')
+
+    from odoo import api
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if 'is_verified' in vals and 'verification_status' not in vals:
+                vals['verification_status'] = 'verified' if vals['is_verified'] else 'pending'
+            elif 'verification_status' in vals and 'is_verified' not in vals:
+                vals['is_verified'] = vals['verification_status'] == 'verified'
+        return super(ResPartnerVerification, self).create(vals_list)
+
+    def write(self, vals):
+        if 'is_verified' in vals and 'verification_status' not in vals:
+            vals['verification_status'] = 'verified' if vals['is_verified'] else 'pending'
+        elif 'verification_status' in vals and 'is_verified' not in vals:
+            vals['is_verified'] = vals['verification_status'] == 'verified'
+        return super(ResPartnerVerification, self).write(vals)
