@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Size -->
+    <record id="attr_size" model="product.attribute">
+        <field name="name">Size</field>
+        <field name="create_variant">always</field>
+    </record>
+    <record id="attr_size_s" model="product.attribute.value">
+        <field name="name">Small</field>
+        <field name="attribute_id" ref="attr_size"/>
+    </record>
+    <record id="attr_size_m" model="product.attribute.value">
+        <field name="name">Medium</field>
+        <field name="attribute_id" ref="attr_size"/>
+    </record>
+    <record id="attr_size_l" model="product.attribute.value">
+        <field name="name">Large</field>
+        <field name="attribute_id" ref="attr_size"/>
+    </record>
+    <record id="attr_size_xl" model="product.attribute.value">
+        <field name="name">X-Large</field>
+        <field name="attribute_id" ref="attr_size"/>
+    </record>
+
+    <!-- Pack Size (bulk B2B ordering) -->
+    <record id="attr_pack_size" model="product.attribute">
+        <field name="name">Pack Size</field>
+        <field name="create_variant">always</field>
+    </record>
+    <record id="attr_pack_single" model="product.attribute.value">
+        <field name="name">Single Unit</field>
+        <field name="attribute_id" ref="attr_pack_size"/>
+    </record>
+    <record id="attr_pack_10" model="product.attribute.value">
+        <field name="name">Pack of 10</field>
+        <field name="attribute_id" ref="attr_pack_size"/>
+    </record>
+    <record id="attr_pack_50" model="product.attribute.value">
+        <field name="name">Pack of 50</field>
+        <field name="attribute_id" ref="attr_pack_size"/>
+    </record>
+    <record id="attr_pack_100" model="product.attribute.value">
+        <field name="name">Pack of 100</field>
+        <field name="attribute_id" ref="attr_pack_size"/>
+    </record>
+
+    <!-- Color -->
+    <record id="attr_color" model="product.attribute">
+        <field name="name">Color</field>
+        <field name="create_variant">always</field>
+        <field name="display_type">color</field>
+    </record>
+    <record id="attr_color_white" model="product.attribute.value">
+        <field name="name">White</field>
+        <field name="attribute_id" ref="attr_color"/>
+        <field name="html_color">#FFFFFF</field>
+    </record>
+    <record id="attr_color_blue" model="product.attribute.value">
+        <field name="name">Blue</field>
+        <field name="attribute_id" ref="attr_color"/>
+        <field name="html_color">#2E86DE</field>
+    </record>
+    <record id="attr_color_black" model="product.attribute.value">
+        <field name="name">Black</field>
+        <field name="attribute_id" ref="attr_color"/>
+        <field name="html_color">#000000</field>
+    </record>
+
+    <!-- Sterility -->
+    <record id="attr_sterility" model="product.attribute">
+        <field name="name">Sterility</field>
+        <field name="create_variant">always</field>
+    </record>
+    <record id="attr_sterile" model="product.attribute.value">
+        <field name="name">Sterile</field>
+        <field name="attribute_id" ref="attr_sterility"/>
+    </record>
+    <record id="attr_non_sterile" model="product.attribute.value">
+        <field name="name">Non-Sterile</field>
+        <field name="attribute_id" ref="attr_sterility"/>
+    </record>
+</odoo>

@@ -3,9 +3,14 @@
     <record id="group_marketplace_admin" model="res.groups">
         <field name="name">Marketplace Admin</field>
         <field name="comment">
-            Can verify/reject buyer companies, upload product images, and
-            move RFQs into "quoted" state via the custom REST API.
+            Can verify/reject buyer companies, upload product images,
+            move RFQs into "quoted" state via the custom REST API, manage
+            product variants, and process return requests.
         </field>
+        <!-- Pulls in Odoo's native "Attributes &amp; Variants" tab/feature
+             on the product form so admins don't need a separate Settings
+             toggle to manage variants. -->
+        <field name="implied_ids" eval="[(4, ref('product.group_product_variant'))]"/>
     </record>
 
     <!-- Give it to the default admin user out of the box so you have

@@ -588,3 +588,91 @@ class MedicalMarketplaceController(http.Controller):
 
         product.write({'image_1920': False})
         return self._json_response({'success': True})
+
+    # ------------------------------------------------------------------
+    # Customer: return requests
+    # ------------------------------------------------------------------
+
+    @http.route('/api/returns', type='http', auth='user', methods=['POST'], csrf=False)
+    def create_return_request(self, **kwargs):
+        try:
+            user = request.env.user
+            order_id = int(kwargs.get('order_id', 0))
+            product_id = int(kwargs.get('product_id', 0))
+            quantity = float(kwargs.get('quantity', 0))
+            return_type = kwargs.get('return_type', 'refund')
+            reason = kwargs.get('reason', '')
+
+            order = request.env['sale.order'].sudo().browse(order_id)
+            if not order.exists() or order.partner_id.id != user.partner_id.id:
+                return self._json_response({'error': 'Order not found'}, status=404)
+            if quantity <= 0:
+                return self._json_response({'error': 'Quantity must be greater than zero'}, status=400)
+            if return_type not in ('refund', 'replacement'):
+                return self._json_response({'error': 'return_type must be "refund" or "replacement"'}, status=400)
+
+            return_request = request.env['medical.return.request'].sudo().create({
+                'sale_order_id': order.id,
+                'product_id': product_id,
+                'quantity': quantity,
+                'return_type': return_type,
+                'reason': reason,
+            })
+            return_request.action_submit()
+
+            return self._json_response({
+                'success': True,
+                'return_id': return_request.id,
+                'name': return_request.name,
+                'state': return_request.state,
+            })
+        except Exception as e:
+            _logger.exception("Return request creation failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/returns', type='http', auth='user', methods=['GET'], csrf=False)
+    def list_return_requests(self, **kwargs):
+        user = request.env.user
+        returns = request.env['medical.return.request'].sudo().search(
+            [('partner_id', '=', user.partner_id.id)])
+        return self._json_response({
+            'returns': [{
+                'id': r.id,
+                'name': r.name,
+                'sale_order_id': r.sale_order_id.id,
+                'product_id': r.product_id.id,
+                'product_name': r.product_id.display_name,
+                'quantity': r.quantity,
+                'return_type': r.return_type,
+                'state': r.state,
+                'request_date': r.request_date,
+            } for r in returns]
+        })
+
+    @http.route('/api/admin/returns/<int:return_id>/approve', type='http', auth='user', methods=['POST'], csrf=False)
+    def admin_approve_return(self, return_id, **kwargs):
+        if resp := self._require_admin():
+            return resp
+        try:
+            return_request = request.env['medical.return.request'].sudo().browse(return_id)
+            if not return_request.exists():
+                return self._json_response({'error': 'Return request not found'}, status=404)
+            return_request.action_approve()
+            return self._json_response({'success': True, 'state': return_request.state})
+        except Exception as e:
+            _logger.exception("Return approval failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/admin/returns/<int:return_id>/reject', type='http', auth='user', methods=['POST'], csrf=False)
+    def admin_reject_return(self, return_id, **kwargs):
+        if resp := self._require_admin():
+            return resp
+        try:
+            return_request = request.env['medical.return.request'].sudo().browse(return_id)
+            if not return_request.exists():
+                return self._json_response({'error': 'Return request not found'}, status=404)
+            return_request.action_reject()
+            return self._json_response({'success': True, 'state': return_request.state})
+        except Exception as e:
+            _logger.exception("Return rejection failed")
+            return self._json_response({'error': str(e)}, status=500)

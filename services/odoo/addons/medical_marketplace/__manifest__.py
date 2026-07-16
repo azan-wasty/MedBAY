@@ -14,7 +14,11 @@
     ],
     'data': [
         'security/marketplace_security.xml',   # NEW: must load before ir.model.access.csv
+        'security/ir.model.access.csv',
+        'data/return_sequence.xml',
+        'data/product_attributes.xml',
         'views/views.xml',
+        'views/return_views.xml',
         'data/mail_templates.xml',              # NEW
     ],
     'installable': True,

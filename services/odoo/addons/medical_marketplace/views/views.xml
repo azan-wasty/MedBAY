@@ -12,6 +12,19 @@
                     <field name="min_order_qty"/>
                     <field name="warranty_period"/>
                 </group>
+                <group string="B2B Vendor Company">
+                    <field name="vendor_id"/>
+                    <field name="seller_ids"/>
+                </group>
+                <group string="Stock">
+                    <field name="type"/>
+                    <field name="qty_available"/>
+                    <field name="low_stock_threshold"/>
+                    <field name="stock_status" widget="badge"
+                           decoration-success="stock_status == 'in_stock'"
+                           decoration-warning="stock_status == 'low_stock'"
+                           decoration-danger="stock_status == 'out_of_stock'"/>
+                </group>
             </xpath>
         </field>
     </record>
