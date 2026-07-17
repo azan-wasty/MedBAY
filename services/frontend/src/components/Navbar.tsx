@@ -9,7 +9,7 @@ import { BRAND_CONFIG, NAV_LINKS } from '../lib/constants';
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<{ name: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; is_admin?: boolean } | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const headerRef = useRef<HTMLElement>(null);
 
@@ -71,13 +71,13 @@ export default function Navbar() {
     // Call the logout route or just clear local storage
     localStorage.removeItem('med_user');
     localStorage.removeItem('med_session');
-    
+
     // Trigger auth update
     window.dispatchEvent(new Event('auth-updated'));
-    
+
     // Clear cookies via proxy route
-    await fetch('/api/auth/login', { method: 'DELETE' }).catch(() => {});
-    
+    await fetch('/api/auth/login', { method: 'DELETE' }).catch(() => { });
+
     router.push('/');
     router.refresh();
   };
@@ -98,9 +98,11 @@ export default function Navbar() {
         <nav style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <ul className="nav-links">
             {NAV_LINKS.map((link) => {
-              // Hide dashboard if not logged in
+              // Hide dashboard/returns if not logged in, hide Admin if not an admin
               if (link.path === '/dashboard' && !user) return null;
-              
+              if (link.path === '/returns' && !user) return null;
+              if (link.path === '/admin/companies' && !user?.is_admin) return null;
+
               const isActive = pathname === link.path;
               return (
                 <li key={link.path}>

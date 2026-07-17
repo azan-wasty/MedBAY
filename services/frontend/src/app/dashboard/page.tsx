@@ -4,8 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { COLOR_PALETTE, DASHBOARD_LABELS, ODOO_STATUS_MAP, AUTH_LABELS } from '../../lib/constants';
-import { RFQItem, User, RFQDetail } from '../../lib/odooClient';
+import { COLOR_PALETTE, DASHBOARD_LABELS, ODOO_STATUS_MAP, AUTH_LABELS, TRACKING_LABELS } from '../../lib/constants';
+import { RFQItem, User, RFQDetail, OrderTracking } from '../../lib/odooClient';
 
 
 function DashboardSkeleton() {
@@ -20,7 +20,7 @@ function DashboardSkeleton() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '2rem' }}>
         <div className="skeleton-card" style={{ gap: '1.25rem' }}>
-          {[1,2,3].map(i => (
+          {[1, 2, 3].map(i => (
             <div key={i}>
               <div className="skeleton skeleton-text" style={{ width: '40%', marginBottom: '0.25rem' }} />
               <div className="skeleton skeleton-text" style={{ width: '75%', height: '1rem' }} />
@@ -32,11 +32,11 @@ function DashboardSkeleton() {
           <div className="table-container">
             <table className="responsive-table">
               <thead>
-                <tr>{[1,2,3,4].map(i => <th key={i}><div className="skeleton skeleton-text" style={{ width: '60%' }} /></th>)}</tr>
+                <tr>{[1, 2, 3, 4].map(i => <th key={i}><div className="skeleton skeleton-text" style={{ width: '60%' }} /></th>)}</tr>
               </thead>
               <tbody>
-                {[1,2,3].map(i => (
-                  <tr key={i}>{[1,2,3,4].map(j => <td key={j}><div className="skeleton skeleton-text" style={{ width: ['55%','70%','50%','65%'][j-1] }} /></td>)}</tr>
+                {[1, 2, 3].map(i => (
+                  <tr key={i}>{[1, 2, 3, 4].map(j => <td key={j}><div className="skeleton skeleton-text" style={{ width: ['55%', '70%', '50%', '65%'][j - 1] }} /></td>)}</tr>
                 ))}
               </tbody>
             </table>
@@ -61,11 +61,20 @@ export default function DashboardPage() {
   const [detailError, setDetailError] = useState<string>('');
   const [approving, setApproving] = useState<boolean>(false);
 
+  // Order Tracking (shipments + invoices) States
+  const [showTracking, setShowTracking] = useState<boolean>(false);
+  const [tracking, setTracking] = useState<OrderTracking | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState<boolean>(false);
+  const [trackingError, setTrackingError] = useState<string>('');
+
   const handleOpenRFQ = async (rfq: RFQItem) => {
     setSelectedRfq(rfq);
     setDetailLoading(true);
     setDetailError('');
     setRfqDetail(null);
+    setShowTracking(false);
+    setTracking(null);
+    setTrackingError('');
     try {
       const res = await fetch(`/api/rfq/${rfq.id}`);
       if (!res.ok) throw new Error('Failed to fetch quote details.');
@@ -87,7 +96,7 @@ export default function DashboardPage() {
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Failed to approve quotation.');
       }
-      
+
       // Update local item status
       setRfqItems((prev) =>
         prev.map((item) => (item.id === id ? { ...item, state: 'sale' } : item))
@@ -99,6 +108,30 @@ export default function DashboardPage() {
       setDetailError(err.message || 'An error occurred during approval.');
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleToggleTracking = async (orderId: number) => {
+    if (showTracking) {
+      setShowTracking(false);
+      return;
+    }
+    setShowTracking(true);
+    if (tracking) return; // already loaded for this order
+
+    try {
+      setTrackingLoading(true);
+      setTrackingError('');
+      const res = await fetch(`/api/orders/${orderId}/tracking`);
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to load shipping/invoice status.');
+      }
+      setTracking(data);
+    } catch (err: any) {
+      setTrackingError(err.message || 'Unable to retrieve tracking information.');
+    } finally {
+      setTrackingLoading(false);
     }
   };
 
@@ -124,7 +157,7 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         const res = await fetch('/api/rfq');
-        
+
         if (res.status === 401) {
           localStorage.removeItem('med_user');
           window.dispatchEvent(new Event('auth-updated'));
@@ -134,7 +167,7 @@ export default function DashboardPage() {
 
         if (!res.ok) throw new Error('Failed to load RFQ status history');
         const data = await res.json();
-        
+
         // Sort by date descending
         const sorted = Array.isArray(data)
           ? data.sort((a: RFQItem, b: RFQItem) => new Date(b.date_order).getTime() - new Date(a.date_order).getTime())
@@ -259,7 +292,7 @@ export default function DashboardPage() {
                         bg: '#f1f5f9',
                         text: '#475569'
                       };
-                      
+
                       return (
                         <motion.tr
                           key={rfq.id}
@@ -279,8 +312,8 @@ export default function DashboardPage() {
                             })}
                           </td>
                           <td style={{ fontWeight: 500 }}>
-                            {rfq.amount_total > 0 
-                              ? `$${rfq.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}` 
+                            {rfq.amount_total > 0
+                              ? `$${rfq.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                               : "Pending"}
                           </td>
                           <td>
@@ -291,12 +324,12 @@ export default function DashboardPage() {
                                 color: statusConfig.text,
                               }}
                             >
-                              <span 
-                                className="status-dot" 
-                                style={{ 
+                              <span
+                                className="status-dot"
+                                style={{
                                   backgroundColor: statusConfig.text,
-                                  marginRight: '0.15rem' 
-                                }} 
+                                  marginRight: '0.15rem'
+                                }}
                               />
                               {statusConfig.label}
                             </span>
@@ -336,7 +369,7 @@ export default function DashboardPage() {
                 <h3 className="modal-title">Quote Details: {selectedRfq.name}</h3>
                 <button className="modal-close-btn" onClick={() => setSelectedRfq(null)}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               </div>
@@ -361,9 +394,9 @@ export default function DashboardPage() {
                       <div>
                         <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 500, textTransform: 'uppercase', marginBottom: '0.25rem' }}>Status</span>
                         <div style={{ marginTop: '0.25rem' }}>
-                          <span 
-                            className="badge" 
-                            style={{ 
+                          <span
+                            className="badge"
+                            style={{
                               backgroundColor: ODOO_STATUS_MAP[rfqDetail.state]?.bg || '#f1f5f9',
                               color: ODOO_STATUS_MAP[rfqDetail.state]?.text || '#475569',
                               display: 'inline-flex'
@@ -413,21 +446,116 @@ export default function DashboardPage() {
                     {rfqDetail.state === 'draft' && (
                       <div className="alert alert-success" style={{ margin: '1rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--primary-light)', border: '1px solid var(--primary-border)', color: 'var(--primary)' }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"/>
-                          <path d="M12 16v-4M12 8h.01"/>
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M12 16v-4M12 8h.01" />
                         </svg>
                         <span style={{ fontSize: '0.8rem' }}>We are reviewing your request. A formal quotation will be posted here shortly.</span>
                       </div>
                     )}
 
                     {rfqDetail.state === 'sale' && (
-                      <div className="alert alert-success" style={{ margin: '1rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                          <path d="m22 4-10 10.01-3-3"/>
-                        </svg>
-                        <span style={{ fontSize: '0.8rem' }}>This quote has been approved. The order is now being processed.</span>
-                      </div>
+                      <>
+                        <div className="alert alert-success" style={{ margin: '1rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <path d="m22 4-10 10.01-3-3" />
+                          </svg>
+                          <span style={{ fontSize: '0.8rem' }}>This quote has been approved. The order is now being processed.</span>
+                        </div>
+
+                        <button
+                          onClick={() => handleToggleTracking(rfqDetail.id)}
+                          className="btn btn-outline"
+                          style={{ marginTop: '1rem', fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                        >
+                          {showTracking ? TRACKING_LABELS.hideButton : TRACKING_LABELS.showButton}
+                        </button>
+
+                        <AnimatePresence>
+                          {showTracking && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.2 }}
+                              style={{ overflow: 'hidden' }}
+                            >
+                              <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--bg-light)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                                {trackingLoading ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                    <span className="spinner" style={{ width: '16px', height: '16px' }} />
+                                    Loading shipping and invoice status...
+                                  </div>
+                                ) : trackingError ? (
+                                  <div className="alert alert-error" style={{ margin: 0 }}>{trackingError}</div>
+                                ) : tracking ? (
+                                  <>
+                                    <h5 style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                      {TRACKING_LABELS.pickingsTitle}
+                                    </h5>
+                                    {tracking.pickings.length === 0 ? (
+                                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>{TRACKING_LABELS.noPickings}</p>
+                                    ) : (
+                                      <div className="table-container" style={{ marginBottom: '1rem' }}>
+                                        <table className="responsive-table" style={{ fontSize: '0.8rem' }}>
+                                          <thead>
+                                            <tr>
+                                              <th>Reference</th>
+                                              <th>Status</th>
+                                              <th>{TRACKING_LABELS.scheduledLabel}</th>
+                                              <th>{TRACKING_LABELS.doneLabel}</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {tracking.pickings.map((p) => (
+                                              <tr key={p.id}>
+                                                <td style={{ fontWeight: 500 }}>{p.name}</td>
+                                                <td style={{ textTransform: 'capitalize' }}>{p.state.replace(/_/g, ' ')}</td>
+                                                <td>{p.scheduled_date ? new Date(p.scheduled_date as string).toLocaleDateString() : '—'}</td>
+                                                <td>{p.date_done ? new Date(p.date_done as string).toLocaleDateString() : '—'}</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+
+                                    <h5 style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                      {TRACKING_LABELS.invoicesTitle}
+                                    </h5>
+                                    {tracking.invoices.length === 0 ? (
+                                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>{TRACKING_LABELS.noInvoices}</p>
+                                    ) : (
+                                      <div className="table-container">
+                                        <table className="responsive-table" style={{ fontSize: '0.8rem' }}>
+                                          <thead>
+                                            <tr>
+                                              <th>Reference</th>
+                                              <th>Status</th>
+                                              <th>Payment</th>
+                                              <th style={{ textAlign: 'right' }}>Amount</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {tracking.invoices.map((inv) => (
+                                              <tr key={inv.id}>
+                                                <td style={{ fontWeight: 500 }}>{inv.name}</td>
+                                                <td style={{ textTransform: 'capitalize' }}>{inv.state}</td>
+                                                <td style={{ textTransform: 'capitalize' }}>{inv.payment_state?.replace(/_/g, ' ')}</td>
+                                                <td style={{ textAlign: 'right' }}>${inv.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </>
+                                ) : null}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </>
                     )}
                   </div>
                 ) : null}

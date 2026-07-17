@@ -30,6 +30,8 @@ export const NAV_LINKS = [
   { label: "Catalog", path: "/" },
   { label: "RFQ Cart", path: "/cart" },
   { label: "Dashboard", path: "/dashboard" },
+  { label: "Returns", path: "/returns" },
+  { label: "Admin", path: "/admin/companies" },
 ];
 
 export const AUTH_LABELS = {
@@ -106,6 +108,90 @@ export const ODOO_STATUS_MAP: Record<string, { label: string; bg: string; text: 
   sale: { label: "Ordered", bg: "#d1fae5", text: "#065f46" },
   done: { label: "Completed", bg: "#e0f2fe", text: "#075985" },
   cancel: { label: "Cancelled", bg: "#fee2e2", text: "#991b1b" },
+};
+
+export const STOCK_STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
+  in_stock: { label: "In Stock", bg: "#d1fae5", text: "#065f46" },
+  low_stock: { label: "Low Stock", bg: "#fef3c7", text: "#92400e" },
+  out_of_stock: { label: "Out of Stock", bg: "#fee2e2", text: "#991b1b" },
+  not_tracked: { label: "Not Tracked", bg: "#f1f5f9", text: "#64748b" },
+};
+
+export const RETURN_STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
+  draft: { label: "Draft", bg: "#f1f5f9", text: "#475569" },
+  requested: { label: "Under Review", bg: "#fef3c7", text: "#92400e" },
+  approved: { label: "Approved", bg: "#dbeafe", text: "#1d4ed8" },
+  rejected: { label: "Rejected", bg: "#fee2e2", text: "#991b1b" },
+  refunded: { label: "Refunded", bg: "#d1fae5", text: "#065f46" },
+  replaced: { label: "Replacement Sent", bg: "#d1fae5", text: "#065f46" },
+  done: { label: "Completed", bg: "#e0f2fe", text: "#075985" },
+  cancelled: { label: "Cancelled", bg: "#f1f5f9", text: "#64748b" },
+};
+
+export const COMPANY_STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
+  pending: { label: "Pending Review", bg: "#fef3c7", text: "#92400e" },
+  verified: { label: "Verified", bg: "#d1fae5", text: "#065f46" },
+  rejected: { label: "Rejected", bg: "#fee2e2", text: "#991b1b" },
+};
+
+export const RETURNS_LABELS = {
+  title: "Product Returns",
+  subtitle: "Request a refund or replacement for equipment from a completed order.",
+  formTitle: "Submit a Return Request",
+  orderLabel: "Select Order",
+  orderPlaceholder: "Choose an ordered item...",
+  productLabel: "Product",
+  quantityLabel: "Quantity to Return",
+  typeLabel: "Requested Resolution",
+  refundOption: "Refund",
+  replacementOption: "Replacement",
+  reasonLabel: "Reason for Return",
+  reasonPlaceholder: "Describe the issue (defect, damage, wrong item, etc.)",
+  submitButton: "Submit Return Request",
+  submitting: "Submitting...",
+  noEligibleOrders: "You don't have any confirmed orders eligible for a return yet.",
+  historyTitle: "Your Return Requests",
+  noReturns: "No return requests yet.",
+  tableName: "Reference",
+  tableProduct: "Product",
+  tableQty: "Qty",
+  tableType: "Resolution",
+  tableStatus: "Status",
+  tableDate: "Requested",
+};
+
+export const TRACKING_LABELS = {
+  title: "Shipping & Invoice Status",
+  showButton: "Track Order",
+  hideButton: "Hide Tracking",
+  pickingsTitle: "Shipments",
+  invoicesTitle: "Invoices",
+  noPickings: "No shipments have been created for this order yet.",
+  noInvoices: "No invoices have been generated for this order yet.",
+  scheduledLabel: "Scheduled",
+  doneLabel: "Completed",
+};
+
+export const ADMIN_COMPANIES_LABELS = {
+  title: "Company Verification",
+  subtitle: "Review and approve B2B buyer organizations before they can submit RFQs.",
+  filterAll: "All",
+  filterPending: "Pending",
+  filterVerified: "Verified",
+  filterRejected: "Rejected",
+  noCompanies: "No companies match this filter.",
+  tableName: "Company",
+  tableEmail: "Email",
+  tableReg: "Registration No.",
+  tableStatus: "Status",
+  tableDate: "Registered",
+  verifyButton: "Verify",
+  rejectButton: "Reject",
+  rejectModalTitle: "Reject Company Verification",
+  rejectReasonLabel: "Reason (visible to internal notes)",
+  confirmReject: "Confirm Rejection",
+  forbiddenTitle: "Admin Access Required",
+  forbiddenMsg: "You must be a marketplace admin to view this page.",
 };
 
 // High-quality mock catalog data used as a fallback if Odoo has no records

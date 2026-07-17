@@ -75,6 +75,62 @@ class MedicalMarketplaceController(http.Controller):
     # Products
     # ------------------------------------------------------------------
 
+    def _serialize_attribute_lines(self, product_tmpl):
+        """Expand product.template.attribute.line records into a
+        JSON-friendly shape the frontend can render directly, e.g.:
+        [{"attribute_name": "Size", "display_type": "radio",
+          "values": [{"id": 3, "name": "Medium", "html_color": false}, ...]}]
+        Raw attribute_line_ids would otherwise just be a bare list of
+        ids, which is useless to a client with no further Odoo access.
+        """
+        lines = []
+        for line in product_tmpl.attribute_line_ids:
+            lines.append({
+                'attribute_id': line.attribute_id.id,
+                'attribute_name': line.attribute_id.name,
+                'display_type': line.attribute_id.display_type,
+                'values': [
+                    {
+                        'id': value.id,
+                        'name': value.name,
+                        'html_color': value.html_color or False,
+                    }
+                    for value in line.value_ids
+                ],
+            })
+        return lines
+
+    def _serialize_variants(self, product_tmpl):
+        """Expand product.product variant records into a JSON-friendly
+        shape describing each concrete sellable combination, e.g.:
+        [{"id": 42, "price": 149.99, "qty_available": 30, "active": true,
+          "combination": [{"attribute_id": 5, "attribute_name": "Color",
+                            "value_id": 12, "value_name": "Blue"}, ...]}]
+        This is what lets the frontend resolve a chosen set of attribute
+        chips down to the specific product.product record that actually
+        carries its own price/stock in Odoo — the product.template itself
+        has neither.
+        """
+        variants = []
+        for variant in product_tmpl.product_variant_ids:
+            combination = [
+                {
+                    'attribute_id': ptav.attribute_id.id,
+                    'attribute_name': ptav.attribute_id.name,
+                    'value_id': ptav.product_attribute_value_id.id,
+                    'value_name': ptav.product_attribute_value_id.name,
+                }
+                for ptav in variant.product_template_attribute_value_ids
+            ]
+            variants.append({
+                'id': variant.id,
+                'price': variant.lst_price,
+                'qty_available': variant.qty_available,
+                'active': variant.active,
+                'combination': combination,
+            })
+        return variants
+
     @http.route('/api/products', type='http', auth='public', methods=['GET'], csrf=False)
     def list_products(self, **kwargs):
         domain = [('sale_ok', '=', True)]
@@ -85,7 +141,8 @@ class MedicalMarketplaceController(http.Controller):
         products = request.env['product.template'].sudo().search_read(
             domain,
             ['id', 'name', 'list_price', 'description_sale', 'categ_id',
-             'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period', 'image_256']
+             'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period', 'image_256',
+             'vendor_id', 'stock_status', 'low_stock_threshold', 'attribute_line_ids']
         )
         return self._json_response(products)
 
@@ -94,11 +151,17 @@ class MedicalMarketplaceController(http.Controller):
         product = request.env['product.template'].sudo().search_read(
             [('id', '=', product_id)],
             ['id', 'name', 'list_price', 'description_sale', 'categ_id',
-             'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period', 'image_1920']
+             'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period', 'image_1920',
+             'vendor_id', 'stock_status', 'low_stock_threshold', 'qty_available']
         )
         if not product:
             return self._json_response({'error': 'Product not found'}, status=404)
-        return self._json_response(product[0])
+
+        product_tmpl = request.env['product.template'].sudo().browse(product_id)
+        result = product[0]
+        result['attribute_lines'] = self._serialize_attribute_lines(product_tmpl)
+        result['variants'] = self._serialize_variants(product_tmpl)
+        return self._json_response(result)
 
     # --- FEATURE: tiered/bulk pricing via pricelist ---
     @http.route('/api/products/<int:product_id>/pricing', type='http', auth='public', methods=['GET'], csrf=False)
@@ -295,11 +358,28 @@ class MedicalMarketplaceController(http.Controller):
                 if not product_template.exists():
                     continue
 
-                product = product_template.product_variant_id
+                # If the buyer selected a specific variant combination (color,
+                # size, etc.) on the product page, item['variant_id'] carries
+                # the exact product.product id. We re-validate it actually
+                # belongs to the requested template before trusting it, since
+                # this is client-supplied input. Falling back to
+                # product_variant_id (Odoo's "first/default variant" shortcut)
+                # preserves old behavior for products with no variants, or
+                # for any pre-existing cart items saved before variant
+                # selection existed.
+                variant = None
+                variant_id = item.get('variant_id')
+                if variant_id:
+                    candidate = request.env['product.product'].sudo().browse(int(variant_id))
+                    if candidate.exists() and candidate.product_tmpl_id.id == product_template.id:
+                        variant = candidate
+
+                if not variant:
+                    variant = product_template.product_variant_id
 
                 request.env['sale.order.line'].sudo().create({
                     'order_id': sale_order.id,
-                    'product_id': product.id,
+                    'product_id': variant.id,
                     'product_uom_qty': item.get('quantity', 1),
                 })
 
@@ -371,14 +451,20 @@ class MedicalMarketplaceController(http.Controller):
             if not order.exists() or order.partner_id.id != user.partner_id.id:
                 return self._json_response({'error': 'Order not found'}, status=404)
 
-            # Retrieve lines with product template fields
+            # Retrieve lines with the actual variant sold, not the parent
+            # template. medical.return.request.product_id (used by the
+            # Returns feature) is a product.product field, so the id
+            # reported here must be variant-level or return submissions
+            # against a specific variant combination would silently
+            # target the wrong (or a nonexistent) record.
             lines = []
             for line in order.order_line:
-                product_template = line.product_template_id
+                variant = line.product_id
                 lines.append({
                     'id': line.id,
-                    'product_id': product_template.id,
-                    'product_name': product_template.name,
+                    'product_id': variant.id,
+                    'product_template_id': variant.product_tmpl_id.id,
+                    'product_name': variant.display_name,
                     'product_uom_qty': line.product_uom_qty,
                     'price_unit': line.price_unit,
                     'price_subtotal': line.price_subtotal,

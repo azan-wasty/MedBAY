@@ -40,7 +40,7 @@ export default function LoginPage() {
       // Success - save user details in localStorage
       localStorage.setItem('med_user', JSON.stringify(data.user));
       localStorage.setItem('med_session', data.session_id);
-      
+
       // Dispatch custom auth-updated event to update the navigation bar dynamically
       window.dispatchEvent(new Event('auth-updated'));
 
@@ -89,12 +89,14 @@ export default function LoginPage() {
           <div className="form-group">
             <label className="form-label">{AUTH_LABELS.emailLabel}</label>
             <input
-              type="email"
+              type="text"
               className="form-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
-              placeholder="you@organization.com"
+              placeholder="you@organization.com or admin"
+              autoCapitalize="none"
+              autoCorrect="off"
               required
             />
           </div>

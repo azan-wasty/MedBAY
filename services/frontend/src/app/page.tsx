@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
-import { BRAND_CONFIG, COLOR_PALETTE, CATALOG_LABELS, MOCK_PRODUCTS } from '../lib/constants';
+import { BRAND_CONFIG, COLOR_PALETTE, CATALOG_LABELS, MOCK_PRODUCTS, STOCK_STATUS_MAP } from '../lib/constants';
 import { Product } from '../lib/odooClient';
 import HeroSection from '../components/HeroSection';
 
@@ -21,9 +22,9 @@ const fadeUp: Variants = {
 };
 
 const toastVariants: Variants = {
-  hidden:  { opacity: 0, y: 16, scale: 0.95 },
-  visible: { opacity: 1, y: 0,  scale: 1, transition: { duration: 0.22, ease: EASE_OUT } },
-  exit:    { opacity: 0, y: 8,  scale: 0.95, transition: { duration: 0.18 } },
+  hidden: { opacity: 0, y: 16, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: EASE_OUT } },
+  exit: { opacity: 0, y: 8, scale: 0.95, transition: { duration: 0.18 } },
 };
 
 const getProductImageSrc = (imgField: string | boolean | undefined) => {
@@ -57,6 +58,7 @@ function SkeletonCard() {
 }
 
 export default function CatalogPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -74,7 +76,7 @@ export default function CatalogPage() {
         if (!res.ok) throw new Error('Failed to load products');
         const data = await res.json();
         setProducts(data);
-        
+
         // Extract unique categories dynamically from products data
         const uniqueCategories = new Set<string>();
         data.forEach((p: Product) => {
@@ -121,7 +123,16 @@ export default function CatalogPage() {
   // Add item to RFQ Cart
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
-    
+
+    // Products with variant attributes (color, size, ...) need a specific
+    // combination selected before we know which product.product record to
+    // add — the catalog card has no UI for that, so send the buyer to the
+    // detail page instead of guessing a default variant for them.
+    if (product.attribute_line_ids && product.attribute_line_ids.length > 0) {
+      router.push(`/products/${product.id}`);
+      return;
+    }
+
     const storedCart = localStorage.getItem('med_cart');
     let cart: { id: number; name: string; quantity: number; price: number }[] = [];
 
@@ -146,7 +157,7 @@ export default function CatalogPage() {
     }
 
     localStorage.setItem('med_cart', JSON.stringify(cart));
-    
+
     // Dispatch storage sync events
     window.dispatchEvent(new Event('cart-updated'));
 
@@ -293,7 +304,7 @@ export default function CatalogPage() {
               <div className="product-grid">
                 {filteredProducts.map((product, i) => {
                   const categoryName = Array.isArray(product.categ_id) ? product.categ_id[1] : product.categ_id;
-                  
+
                   return (
                     <motion.div
                       key={product.id}
@@ -323,18 +334,32 @@ export default function CatalogPage() {
                           </div>
                         )}
                       </Link>
-                      <span className="product-tag">{categoryName || "Equipment"}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                        <span className="product-tag">{categoryName || "Equipment"}</span>
+                        {product.stock_status && product.stock_status !== 'not_tracked' && (
+                          <span
+                            className="badge"
+                            style={{
+                              backgroundColor: STOCK_STATUS_MAP[product.stock_status]?.bg,
+                              color: STOCK_STATUS_MAP[product.stock_status]?.text,
+                              fontSize: '0.7rem',
+                            }}
+                          >
+                            {STOCK_STATUS_MAP[product.stock_status]?.label}
+                          </span>
+                        )}
+                      </div>
                       <h3 className="product-title">
                         <Link href={`/products/${product.id}`} style={{ color: 'inherit' }}>
                           {product.name}
                         </Link>
                       </h3>
                       <p className="product-desc" style={{ WebkitBoxOrient: 'vertical' }}>{product.description_sale || "No description provided."}</p>
-                      
+
                       <div className="product-price-box">
                         <span className="product-price-label">{CATALOG_LABELS.priceOnRequest}</span>
                         <div className="product-price">
-                          {product.list_price > 0 
+                          {product.list_price > 0
                             ? `$${product.list_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                             : "Contact Sales"}
                         </div>
@@ -344,6 +369,11 @@ export default function CatalogPage() {
                         <span>{CATALOG_LABELS.moqLabel}: <strong>{product.min_order_qty}</strong></span>
                         <span>{CATALOG_LABELS.warrantyLabel}: <strong>{product.warranty_period || "N/A"}</strong></span>
                       </div>
+                      {Array.isArray(product.vendor_id) && (
+                        <div className="product-meta-row" style={{ marginTop: '0.25rem' }}>
+                          <span>Supplier: <strong>{product.vendor_id[1]}</strong></span>
+                        </div>
+                      )}
 
                       <div className="product-actions">
                         <Link href={`/products/${product.id}`} className="btn btn-outline">
@@ -353,7 +383,9 @@ export default function CatalogPage() {
                           onClick={(e) => handleAddToCart(product, e)}
                           className="btn btn-primary"
                         >
-                          {CATALOG_LABELS.addToCart}
+                          {product.attribute_line_ids && product.attribute_line_ids.length > 0
+                            ? 'Select Options'
+                            : CATALOG_LABELS.addToCart}
                         </button>
                       </div>
                     </motion.div>
@@ -367,4 +399,3 @@ export default function CatalogPage() {
     </div>
   );
 }
-

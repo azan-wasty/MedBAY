@@ -12,16 +12,18 @@ interface CartItem {
   name: string;
   quantity: number;
   price: number;
+  variantId?: number;
+  variantLabel?: string;
 }
 
 const alertVariants: Variants = {
-  hidden:  { opacity: 0, y: -8, scale: 0.98 },
-  visible: { opacity: 1, y: 0,  scale: 1, transition: { duration: 0.2 } },
-  exit:    { opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.15 } },
+  hidden: { opacity: 0, y: -8, scale: 0.98 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2 } },
+  exit: { opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.15 } },
 };
 
 const successVariants: Variants = {
-  hidden:  { opacity: 0, scale: 0.95 },
+  hidden: { opacity: 0, scale: 0.95 },
   visible: { opacity: 1, scale: 1, transition: { duration: 0.3, type: 'spring' as const, stiffness: 300, damping: 20 } },
 };
 
@@ -92,6 +94,7 @@ export default function CartPage() {
 
       const items = cartItems.map((item) => ({
         product_id: item.id,
+        ...(item.variantId ? { variant_id: item.variantId } : {}),
         quantity: item.quantity,
       }));
 
@@ -244,6 +247,11 @@ export default function CartPage() {
                           <Link href={`/products/${item.id}`} style={{ color: COLOR_PALETTE.textDark }}>
                             {item.name}
                           </Link>
+                          {item.variantLabel && (
+                            <div style={{ fontSize: '0.75rem', fontWeight: 400, color: COLOR_PALETTE.textSecondary, marginTop: '0.15rem' }}>
+                              {item.variantLabel}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -291,7 +299,7 @@ export default function CartPage() {
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '1rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
               Quote Summary
             </h3>
-            
+
             <p style={{ color: COLOR_PALETTE.textSecondary, fontSize: '0.75rem', lineHeight: '1.5', marginBottom: '1.25rem' }}>
               Final pricing is determined on a quote-by-quote basis depending on quantities and your organization's profile.
             </p>
@@ -325,12 +333,3 @@ export default function CartPage() {
     </div>
   );
 }
-
-
-interface CartItem {
-  id: number;
-  name: string;
-  quantity: number;
-  price: number;
-}
-

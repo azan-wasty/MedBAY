@@ -9,6 +9,47 @@ export interface OdooRequestInit extends RequestInit {
   };
 }
 
+export interface AttributeValue {
+  id: number;
+  name: string;
+  html_color: string | false;
+}
+
+export interface AttributeLine {
+  attribute_id: number;
+  attribute_name: string;
+  display_type: string;
+  values: AttributeValue[];
+}
+
+export interface PriceBreak {
+  min_qty: number;
+  price: number;
+  discount_pct: number;
+}
+
+export interface ProductPricing {
+  product_id: number;
+  base_price: number;
+  currency: string | null;
+  price_breaks: PriceBreak[];
+}
+
+export interface VariantCombinationValue {
+  attribute_id: number;
+  attribute_name: string;
+  value_id: number;
+  value_name: string;
+}
+
+export interface ProductVariant {
+  id: number;
+  price: number;
+  qty_available: number;
+  active: boolean;
+  combination: VariantCombinationValue[];
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -21,6 +62,17 @@ export interface Product {
   warranty_period: string | boolean;
   image_1920?: string | boolean;
   image_256?: string | boolean;
+  vendor_id?: [number, string] | boolean;
+  stock_status?: 'in_stock' | 'low_stock' | 'out_of_stock' | 'not_tracked';
+  low_stock_threshold?: number;
+  qty_available?: number;
+  // Raw attribute_line ids returned on the LIST endpoint only, as a cheap
+  // "does this product have variants?" hint (attribute_lines/variants below
+  // are only fully expanded on the /api/products/<id> detail endpoint —
+  // kept off the list endpoint to keep the catalog grid payload light).
+  attribute_line_ids?: number[];
+  attribute_lines?: AttributeLine[];
+  variants?: ProductVariant[];
 }
 
 export interface User {
@@ -28,6 +80,71 @@ export interface User {
   name: string;
   email: string;
   partner_id: number;
+  is_admin?: boolean;
+  verification_status?: 'pending' | 'verified' | 'rejected';
+}
+
+export interface Picking {
+  id: number;
+  name: string;
+  state: string;
+  scheduled_date: string | boolean;
+  date_done: string | boolean;
+}
+
+export interface OrderInvoice {
+  id: number;
+  name: string;
+  state: string;
+  payment_state: string;
+  amount_total: number;
+  invoice_date: string | boolean;
+}
+
+export interface OrderTracking {
+  order_id: number;
+  name: string;
+  state: string;
+  invoice_status: string;
+  amount_total: number;
+  date_order: string;
+  pickings: Picking[];
+  invoices: OrderInvoice[];
+}
+
+export interface ReturnRequest {
+  id: number;
+  name: string;
+  sale_order_id: number;
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  return_type: 'refund' | 'replacement';
+  state: string;
+  request_date: string;
+}
+
+export interface CompanyPartner {
+  id: number;
+  name: string;
+  email: string | boolean;
+  registration_number: string | boolean;
+  verification_status: 'pending' | 'verified' | 'rejected';
+  verification_date: string | boolean;
+  create_date: string;
+}
+
+/**
+ * The Odoo /api/returns POST controller reads its input via `kwargs.get(...)`
+ * (type='http', not a JSON body parse like /api/rfq or /api/admin/companies/*
+ * /reject). That means it expects a form-urlencoded body, not JSON — sending
+ * JSON here would silently produce zeroed-out values server-side because
+ * kwargs.get('order_id', 0) would fall through to its default every time.
+ */
+function toFormBody(data: Record<string, string | number>): string {
+  const body = new URLSearchParams();
+  Object.entries(data).forEach(([key, value]) => body.set(key, String(value)));
+  return body.toString();
 }
 
 export interface LoginResult {
@@ -48,6 +165,7 @@ export interface RFQItem {
 export interface RFQLine {
   id: number;
   product_id: number;
+  product_template_id: number;
   product_name: string;
   product_uom_qty: number;
   price_unit: number;
@@ -143,6 +261,17 @@ export const odooClient = {
   },
 
   /**
+   * Fetch tiered/bulk pricing breaks for a product
+   */
+  async getProductPricing(id: number | string, pricelistId?: number | string): Promise<ProductPricing> {
+    const query = pricelistId ? `?pricelist_id=${pricelistId}` : '';
+    return this.request<ProductPricing>(`/api/products/${id}/pricing${query}`, {
+      method: 'GET',
+      next: { revalidate: 30 },
+    });
+  },
+
+  /**
    * Log in user.
    *
    * THE FIX: Odoo rotates the session id on successful authentication
@@ -230,7 +359,7 @@ export const odooClient = {
    * Create RFQ (Draft Sales Order) in Odoo
    */
   async createRFQ(
-    items: { product_id: number; quantity: number }[],
+    items: { product_id: number; variant_id?: number; quantity: number }[],
     sessionId: string
   ): Promise<{ success: boolean; rfq_id?: number; name?: string; error?: string }> {
     return this.request('/api/rfq', {
@@ -281,4 +410,147 @@ export const odooClient = {
       cache: 'no-store',
     });
   },
+
+  /**
+   * Fetch shipping (stock picking) and invoicing status for a confirmed order
+   */
+  async getOrderTracking(orderId: number | string, sessionId: string): Promise<OrderTracking> {
+    return this.request<OrderTracking>(`/api/orders/${orderId}/tracking`, {
+      method: 'GET',
+      headers: {
+        Cookie: `session_id=${sessionId}`,
+      },
+      cache: 'no-store',
+    });
+  },
+
+  /**
+   * Submit a return request against a delivered order line.
+   * See `toFormBody` above for why this is urlencoded, not JSON.
+   */
+  async createReturnRequest(
+    data: {
+      order_id: number;
+      product_id: number;
+      quantity: number;
+      return_type: 'refund' | 'replacement';
+      reason: string;
+    },
+    sessionId: string
+  ): Promise<{ success: boolean; return_id?: number; name?: string; state?: string; error?: string }> {
+    return this.request('/api/returns', {
+      method: 'POST',
+      headers: {
+        Cookie: `session_id=${sessionId}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: toFormBody(data),
+      cache: 'no-store',
+    });
+  },
+
+  /**
+   * Retrieve the calling buyer company's own return requests
+   */
+  async getReturnRequests(sessionId: string): Promise<{ returns: ReturnRequest[] }> {
+    return this.request<{ returns: ReturnRequest[] }>('/api/returns', {
+      method: 'GET',
+      headers: {
+        Cookie: `session_id=${sessionId}`,
+      },
+      cache: 'no-store',
+    });
+  },
+
+  /**
+   * Admin: list companies pending/verified/rejected B2B verification
+   */
+  async adminListCompanies(sessionId: string, status?: string): Promise<CompanyPartner[]> {
+    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request<CompanyPartner[]>(`/api/admin/companies${query}`, {
+      method: 'GET',
+      headers: {
+        Cookie: `session_id=${sessionId}`,
+      },
+      cache: 'no-store',
+    });
+  },
+
+  /**
+   * Admin: verify a company for B2B ordering
+   */
+  async adminVerifyCompany(
+    partnerId: number,
+    sessionId: string
+  ): Promise<{ success: boolean; verification_status: string }> {
+    return this.request(`/api/admin/companies/${partnerId}/verify`, {
+      method: 'POST',
+      headers: {
+        Cookie: `session_id=${sessionId}`,
+      },
+      cache: 'no-store',
+    });
+  },
+
+  /**
+   * Admin: reject a company's verification, with an optional reason note
+   */
+  async adminRejectCompany(
+    partnerId: number,
+    reason: string,
+    sessionId: string
+  ): Promise<{ success: boolean; verification_status: string }> {
+    return this.request(`/api/admin/companies/${partnerId}/reject`, {
+      method: 'POST',
+      headers: {
+        Cookie: `session_id=${sessionId}`,
+      },
+      body: JSON.stringify({ reason }),
+      cache: 'no-store',
+    });
+  },
+
+  /**
+   * Admin: approve a submitted return request
+   */
+  async adminApproveReturn(
+    returnId: number,
+    sessionId: string
+  ): Promise<{ success: boolean; state: string }> {
+    return this.request(`/api/admin/returns/${returnId}/approve`, {
+      method: 'POST',
+      headers: {
+        Cookie: `session_id=${sessionId}`,
+      },
+      cache: 'no-store',
+    });
+  },
+
+  /**
+   * Admin: reject a submitted return request
+   */
+  async adminRejectReturn(
+    returnId: number,
+    sessionId: string
+  ): Promise<{ success: boolean; state: string }> {
+    return this.request(`/api/admin/returns/${returnId}/reject`, {
+      method: 'POST',
+      headers: {
+        Cookie: `session_id=${sessionId}`,
+      },
+      cache: 'no-store',
+    });
+  },
 };
+
+/**
+ * Best-effort extraction of the numeric status code Odoo embedded in the
+ * `Odoo API Error: [xxx] ...` message thrown by `odooClient.request`.
+ * Lets Next.js API routes forward the real status (e.g. 403 Forbidden for
+ * non-admins, 404 Not Found) instead of collapsing every failure to a
+ * generic 502.
+ */
+export function extractOdooStatus(message: string): number | null {
+  const match = message.match(/\[(\d{3})\]/);
+  return match ? parseInt(match[1], 10) : null;
+}
