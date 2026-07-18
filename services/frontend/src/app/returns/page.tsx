@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { COLOR_PALETTE, RETURNS_LABELS, RETURN_STATUS_MAP, AUTH_LABELS } from '../../lib/constants';
-import { RFQItem, RFQDetail, RFQLine, ReturnRequest } from '../../lib/odooClient';
+import { COLOR_PALETTE, RETURNS_LABELS, RETURN_STATUS_MAP } from '../../lib/constants';
+import { RFQItem, RFQDetail, RFQLine, ReturnRequest, ReturnReason } from '../../lib/odooClient';
 
 export default function ReturnsPage() {
     const router = useRouter();
@@ -21,7 +20,12 @@ export default function ReturnsPage() {
     const [productId, setProductId] = useState<string>('');
     const [quantity, setQuantity] = useState<string>('1');
     const [returnType, setReturnType] = useState<'refund' | 'replacement'>('refund');
-    const [reason, setReason] = useState<string>('');
+    const [reasonCategoryId, setReasonCategoryId] = useState<string>('');
+    const [reasonDetail, setReasonDetail] = useState<string>('');
+
+    const [returnReasons, setReturnReasons] = useState<ReturnReason[]>([]);
+    const [loadingReasons, setLoadingReasons] = useState(true);
+    const [reasonsError, setReasonsError] = useState('');
 
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
@@ -61,13 +65,9 @@ export default function ReturnsPage() {
             try {
                 setLoadingOrders(true);
                 const res = await fetch('/api/rfq');
-                if (res.status === 401) {
-                    router.push('/login');
-                    return;
-                }
+                if (res.status === 401) { router.push('/login'); return; }
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to load orders');
-                // Only confirmed ("sale") orders have been delivered/invoiced and are eligible for returns
                 const eligible = Array.isArray(data) ? data.filter((o: RFQItem) => o.state === 'sale') : [];
                 setEligibleOrders(eligible);
             } catch (err) {
@@ -77,8 +77,24 @@ export default function ReturnsPage() {
             }
         };
 
+        const loadReasonCategories = async () => {
+            try {
+                setLoadingReasons(true);
+                setReasonsError('');
+                const res = await fetch('/api/returns/reasons');
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || 'Failed');
+                setReturnReasons(Array.isArray(data) ? data : []);
+            } catch {
+                setReasonsError(RETURNS_LABELS.reasonsError);
+            } finally {
+                setLoadingReasons(false);
+            }
+        };
+
         loadOrders();
         loadReturns();
+        loadReasonCategories();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router]);
 
@@ -106,8 +122,8 @@ export default function ReturnsPage() {
         setSubmitError('');
         setSubmitSuccess('');
 
-        if (!selectedOrderId || !productId || !quantity || !reason.trim()) {
-            setSubmitError('Please fill in all fields before submitting.');
+        if (!selectedOrderId || !productId || !quantity || !reasonCategoryId) {
+            setSubmitError('Please fill in all required fields (including Return Reason).');
             return;
         }
 
@@ -121,19 +137,25 @@ export default function ReturnsPage() {
                     product_id: parseInt(productId, 10),
                     quantity: parseFloat(quantity),
                     return_type: returnType,
-                    reason: reason.trim(),
+                    reason_category_id: parseInt(reasonCategoryId, 10),
+                    reason_detail: reasonDetail.trim(),
                 }),
             });
             const data = await res.json();
             if (!res.ok || data.error) throw new Error(data.error || 'Failed to submit return request');
 
-            setSubmitSuccess(`Return request ${data.name || ''} submitted successfully.`);
+            // Show confirmation message from API config, not hardcoded
+            setSubmitSuccess(
+                (data.name ? `Return request ${data.name} submitted. ` : '') +
+                (data.confirmation_message || 'Your return request has been received.')
+            );
             setSelectedOrderId('');
             setOrderLines([]);
             setProductId('');
             setQuantity('1');
             setReturnType('refund');
-            setReason('');
+            setReasonCategoryId('');
+            setReasonDetail('');
             loadReturns();
         } catch (err: any) {
             setSubmitError(err.message || 'An error occurred while submitting your return request.');
@@ -259,18 +281,43 @@ export default function ReturnsPage() {
                             </div>
                         </div>
 
-                        <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                            <label className="form-label">{RETURNS_LABELS.reasonLabel}</label>
-                            <textarea
-                                className="form-input"
-                                rows={3}
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                                placeholder={RETURNS_LABELS.reasonPlaceholder}
-                                disabled={submitting}
-                                required
-                            />
-                        </div>
+                        <div className="form-group">
+                             <label className="form-label">{RETURNS_LABELS.reasonLabel}</label>
+                             {loadingReasons ? (
+                                 <div style={{ fontSize: '0.8rem', color: COLOR_PALETTE.textMuted, padding: '0.5rem 0' }}>
+                                     {RETURNS_LABELS.loadingReasons}
+                                 </div>
+                             ) : reasonsError ? (
+                                 <div style={{ fontSize: '0.8rem', color: '#991b1b', padding: '0.5rem 0' }}>
+                                     {reasonsError}
+                                 </div>
+                             ) : (
+                                 <select
+                                     className="form-input"
+                                     value={reasonCategoryId}
+                                     onChange={(e) => setReasonCategoryId(e.target.value)}
+                                     disabled={submitting}
+                                     required
+                                 >
+                                     <option value="">{RETURNS_LABELS.reasonPlaceholder}</option>
+                                     {returnReasons.map((r) => (
+                                         <option key={r.id} value={r.id}>{r.name}</option>
+                                     ))}
+                                 </select>
+                             )}
+                         </div>
+
+                         <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                             <label className="form-label">{RETURNS_LABELS.reasonDetailLabel}</label>
+                             <textarea
+                                 className="form-input"
+                                 rows={2}
+                                 value={reasonDetail}
+                                 onChange={(e) => setReasonDetail(e.target.value)}
+                                 placeholder={RETURNS_LABELS.reasonDetailPlaceholder}
+                                 disabled={submitting}
+                             />
+                         </div>
 
                         <button
                             type="submit"
@@ -306,6 +353,7 @@ export default function ReturnsPage() {
                                     <th>{RETURNS_LABELS.tableName}</th>
                                     <th>{RETURNS_LABELS.tableProduct}</th>
                                     <th>{RETURNS_LABELS.tableQty}</th>
+                                    <th>{RETURNS_LABELS.tableReason}</th>
                                     <th>{RETURNS_LABELS.tableType}</th>
                                     <th>{RETURNS_LABELS.tableStatus}</th>
                                     <th>{RETURNS_LABELS.tableDate}</th>
@@ -319,6 +367,7 @@ export default function ReturnsPage() {
                                             <td style={{ fontWeight: 500 }}>{r.name}</td>
                                             <td>{r.product_name}</td>
                                             <td>{r.quantity}</td>
+                                            <td>{r.reason_category || '—'}</td>
                                             <td style={{ textTransform: 'capitalize' }}>{r.return_type}</td>
                                             <td>
                                                 <span className="badge" style={{ backgroundColor: statusConfig.bg, color: statusConfig.text }}>

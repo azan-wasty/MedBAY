@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { odooClient, OdooSessionExpiredError, extractOdooStatus } from '../../../../../../lib/odooClient';
+import { odooClient, OdooSessionExpiredError, extractOdooStatus } from '../../../../../lib/odooClient';
 
 export async function POST(
     request: Request,

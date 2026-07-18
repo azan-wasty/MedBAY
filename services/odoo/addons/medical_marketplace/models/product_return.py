@@ -1,7 +1,7 @@
 import logging
 
-from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo import _, api, fields, models  # type: ignore
+from odoo.exceptions import UserError  # type: ignore
 
 _logger = logging.getLogger(__name__)
 
@@ -9,14 +9,15 @@ _logger = logging.getLogger(__name__)
 class MedicalReturnRequest(models.Model):
     """Customer-facing return cycle for delivered B2B orders.
 
-    Draft -> Requested -> Approved -> Refunded/Replaced -> Done
-                       \\-> Rejected
-    Any pre-Done state can be Cancelled.
+    State machine:
+        draft → requested → approved → refunded/replaced → done
+                          ↘ rejected
+    Any pre-done state can be cancelled.
 
-    Inventory movement on approval and refunds on completion are both
-    generated through Odoo's own built-in mechanisms
-    (`stock.return.picking` wizard and `account.move` credit notes) —
-    nothing here reimplements stock or accounting logic from scratch.
+    Inventory movement on approval and refunds on completion are both generated
+    through Odoo's own built-in mechanisms (stock.return.picking wizard and
+    account.move credit notes) — nothing here reimplements stock or accounting
+    logic from scratch.
     """
     _name = 'medical.return.request'
     _description = 'Product Return Request'
@@ -38,7 +39,7 @@ class MedicalReturnRequest(models.Model):
     order_line_id = fields.Many2one(
         'sale.order.line', string='Order Line',
         domain="[('order_id', '=', sale_order_id)]",
-        help='The specific order line being returned (used to size the max returnable quantity).',
+        help='The specific order line being returned.',
     )
     product_id = fields.Many2one(
         'product.product', string='Product', required=True, tracking=True,
@@ -48,14 +49,24 @@ class MedicalReturnRequest(models.Model):
         [('refund', 'Refund'), ('replacement', 'Replacement')],
         string='Requested Resolution', required=True, default='refund', tracking=True,
     )
-    reason = fields.Text(string='Reason for Return', required=True)
+
+    # --- Reason (Feature 1: dropdown from medical.return.reason, not free text) ---
+    reason_category_id = fields.Many2one(
+        'medical.return.reason', string='Return Reason', required=True, tracking=True,
+        help='Select the category that best describes why the product is being returned.',
+    )
+    reason_detail = fields.Text(
+        string='Additional Details',
+        help='Optional elaboration on the selected reason.',
+    )
+
     admin_notes = fields.Text(string='Internal Notes')
     request_date = fields.Datetime(default=fields.Datetime.now, readonly=True)
 
     state = fields.Selection(
         [
             ('draft', 'Draft'),
-            ('requested', 'Requested'),
+            ('requested', 'Under Review'),
             ('approved', 'Approved'),
             ('rejected', 'Rejected'),
             ('refunded', 'Refunded'),
@@ -77,6 +88,24 @@ class MedicalReturnRequest(models.Model):
     refund_move_id = fields.Many2one(
         'account.move', string='Credit Note', copy=False, readonly=True,
     )
+
+    @api.constrains('product_id', 'sale_order_id', 'quantity')
+    def _check_return_quantity_and_product(self):
+        for rec in self:
+            # Only validate if not draft/cancelled
+            if rec.state in ('draft', 'cancelled'):
+                continue
+            # 1. Ensure product is in order lines
+            lines = rec.sale_order_id.order_line.filtered(lambda l: l.product_id == rec.product_id)
+            if not lines:
+                raise UserError(_("The selected product '%s' is not part of this sale order.") % rec.product_id.display_name)
+            
+            # 2. Ensure quantity does not exceed delivered quantity
+            total_delivered = sum(lines.mapped('qty_delivered'))
+            if rec.quantity > total_delivered:
+                raise UserError(_(
+                    "Requested return quantity (%.2f) exceeds the total delivered quantity (%.2f) for this product."
+                ) % (rec.quantity, total_delivered))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -111,9 +140,7 @@ class MedicalReturnRequest(models.Model):
         self.write({'state': 'cancelled'})
 
     def action_approve(self):
-        """Admin approves the return: locate the delivered picking and
-        create the physical incoming return via Odoo's built-in
-        stock.return.picking wizard, scoped to just this product/qty."""
+        """Admin approves the return and creates the physical incoming return picking."""
         for rec in self:
             if rec.state != 'requested':
                 raise UserError(_('Only requested returns can be approved.'))
@@ -135,9 +162,7 @@ class MedicalReturnRequest(models.Model):
         return pickings[:1]
 
     def _create_return_picking(self, picking):
-        """Wrap the core stock.return.picking wizard, adjusting the
-        auto-populated return move lines down to the requested quantity
-        for just this product."""
+        """Wrap stock.return.picking wizard, scoping quantities to this return's product/qty."""
         self.ensure_one()
         wizard = self.env['stock.return.picking'].with_context(
             active_id=picking.id, active_model='stock.picking',
@@ -154,15 +179,10 @@ class MedicalReturnRequest(models.Model):
         return_picking.action_confirm()
         return_picking.action_assign()
         return_picking.button_validate()
-        # Auto-clear any backorder prompt in headless flows (Odoo 17
-        # already applies skip flags on the picking's env context here
-        # since move quantities are pre-set to the exact returned qty).
         self.return_picking_id = return_picking
 
     def action_process_refund(self):
-        """Complete the cycle: issue a credit note (refund) or leave it
-        marked for replacement fulfillment, using account.move the same
-        way Odoo's own Sales/Invoicing refund flow does."""
+        """Complete the cycle: issue a credit note or mark as replacement."""
         for rec in self:
             if rec.state != 'approved':
                 raise UserError(_('Only approved returns can be finalized.'))
@@ -186,6 +206,7 @@ class MedicalReturnRequest(models.Model):
             if inv_line:
                 price_unit = inv_line.price_unit
 
+        reason_label = self.reason_category_id.name if self.reason_category_id else self.product_id.display_name
         credit_note = self.env['account.move'].create({
             'move_type': 'out_refund',
             'partner_id': self.partner_id.id,
@@ -196,7 +217,7 @@ class MedicalReturnRequest(models.Model):
                 'product_id': self.product_id.id,
                 'quantity': self.quantity,
                 'price_unit': price_unit,
-                'name': _('Return: %s', self.reason or self.product_id.display_name),
+                'name': _('Return: %s', reason_label),
             })],
         })
         self.refund_move_id = credit_note

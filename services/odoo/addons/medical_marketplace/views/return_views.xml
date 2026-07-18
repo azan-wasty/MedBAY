@@ -12,6 +12,7 @@
                 <field name="partner_id"/>
                 <field name="product_id"/>
                 <field name="quantity"/>
+                <field name="reason_category_id"/>
                 <field name="return_type"/>
                 <field name="request_date"/>
                 <field name="state" widget="badge"/>
@@ -61,8 +62,9 @@
                         </group>
                     </group>
                     <group string="Return Details">
-                        <field name="reason"/>
-                        <field name="admin_notes"/>
+                        <field name="reason_category_id"/>
+                        <field name="reason_detail" placeholder="Optional: provide additional context..."/>
+                        <field name="admin_notes" placeholder="Internal notes (admin only, not visible to buyer)"/>
                     </group>
                 </sheet>
                 <div class="oe_chatter">

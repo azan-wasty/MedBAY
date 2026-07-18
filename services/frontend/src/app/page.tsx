@@ -376,17 +376,29 @@ export default function CatalogPage() {
                       )}
 
                       <div className="product-actions">
-                        <Link href={`/products/${product.id}`} className="btn btn-outline">
+                        <Link href={`/products/${product.id}`} className="btn btn-outline" style={{ flex: 1, textAlign: 'center' }}>
                           {CATALOG_LABELS.viewDetails}
                         </Link>
-                        <button
-                          onClick={(e) => handleAddToCart(product, e)}
-                          className="btn btn-primary"
-                        >
-                          {product.attribute_line_ids && product.attribute_line_ids.length > 0
-                            ? 'Select Options'
-                            : CATALOG_LABELS.addToCart}
-                        </button>
+                        {product.stock_status === 'out_of_stock' ? (
+                          <button
+                            className="btn btn-disabled"
+                            disabled
+                            title={CATALOG_LABELS.outOfStockTooltip}
+                            style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#94a3b8', border: '1px solid #cbd5e1', cursor: 'not-allowed' }}
+                          >
+                            {CATALOG_LABELS.outOfStockLabel}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => handleAddToCart(product, e)}
+                            className="btn btn-primary"
+                            style={{ flex: 1 }}
+                          >
+                            {product.attribute_line_ids && product.attribute_line_ids.length > 0
+                              ? 'Select Options'
+                              : CATALOG_LABELS.addToCart}
+                          </button>
+                        )}
                       </div>
                     </motion.div>
                   );

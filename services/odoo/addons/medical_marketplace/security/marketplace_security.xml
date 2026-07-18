@@ -1,22 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- ================================================================
+         Security Group: Marketplace Admin
+         ================================================================ -->
     <record id="group_marketplace_admin" model="res.groups">
         <field name="name">Marketplace Admin</field>
         <field name="comment">
             Can verify/reject buyer companies, upload product images,
-            move RFQs into "quoted" state via the custom REST API, manage
-            product variants, and process return requests.
+            publish/unpublish products, move RFQs into "quoted" state via the
+            custom REST API, manage product variants and sourcing companies,
+            enter shipping/tracking information, and process return requests.
         </field>
-        <!-- Pulls in Odoo's native "Attributes &amp; Variants" tab/feature
-             on the product form so admins don't need a separate Settings
-             toggle to manage variants. -->
+        <!-- Pulls in Odoo's native "Attributes &amp; Variants" tab/feature. -->
         <field name="implied_ids" eval="[(4, ref('product.group_product_variant'))]"/>
     </record>
 
-    <!-- Give it to the default admin user out of the box so you have
-         someone to test with immediately. Add other users to this group
-         through Settings > Users in the Odoo backend as needed. -->
+    <!-- Give the default admin user the marketplace admin group immediately. -->
     <record id="base.user_admin" model="res.users">
         <field name="groups_id" eval="[(4, ref('group_marketplace_admin'))]"/>
     </record>
+
+    <!-- ================================================================
+         Record Rules: Portal Users — own data isolation (IDOR prevention)
+         ================================================================ -->
+
+    <!-- sale.order: portal users see only their own company's orders -->
+    <record id="rule_sale_order_portal" model="ir.rule">
+        <field name="name">Portal: own company sale orders only</field>
+        <field name="model_id" ref="sale.model_sale_order"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- medical.return.request: portal users see only their own company's returns -->
+    <record id="rule_return_request_portal" model="ir.rule">
+        <field name="name">Portal: own company return requests only</field>
+        <field name="model_id" ref="medical_marketplace.model_medical_return_request"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- medical.order.review: portal users see and delete only their own company's reviews -->
+    <record id="rule_order_review_portal" model="ir.rule">
+        <field name="name">Portal: own company reviews only</field>
+        <field name="model_id" ref="medical_marketplace.model_medical_order_review"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
 </odoo>

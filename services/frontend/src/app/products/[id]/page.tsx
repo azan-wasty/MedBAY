@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import { COLOR_PALETTE, PRODUCT_DETAILS_LABELS, CATALOG_LABELS, CART_LABELS, STOCK_STATUS_MAP } from '../../../lib/constants';
-import { Product, ProductPricing, AttributeLine, ProductVariant } from '../../../lib/odooClient';
+import { Product, ProductPricing, AttributeLine, ProductVariant, ProductReview } from '../../../lib/odooClient';
 
 const EASE_OUT = [0.4, 0, 0.2, 1] as [number, number, number, number];
 
@@ -77,6 +77,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [pricingLoading, setPricingLoading] = useState<boolean>(true);
   // Maps attribute_id -> chosen value_id for each variant attribute (Color, Size, ...)
   const [selectedValues, setSelectedValues] = useState<Record<number, number>>({});
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -118,8 +119,21 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       }
     };
 
+    const fetchReviews = async () => {
+      try {
+        const res = await fetch(`/api/products/${productId}/reviews`);
+        if (res.ok) {
+          const data = await res.json();
+          setReviews(data);
+        }
+      } catch (err) {
+        console.error('Error fetching product reviews:', err);
+      }
+    };
+
     fetchDetail();
     fetchPricing();
+    fetchReviews();
   }, [productId]);
 
   // Resolves the currently-selected attribute chips down to the specific
@@ -161,6 +175,18 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       setErrorMsg(`${PRODUCT_DETAILS_LABELS.moqWarning} (${CATALOG_LABELS.moqLabel}: ${product.min_order_qty})`);
     } else {
       setErrorMsg('');
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!confirm('Are you sure you want to delete this review? This action cannot be undone, and you cannot submit another review for this order.')) return;
+    try {
+      const res = await fetch(`/api/reviews/${reviewId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete review');
+      setReviews((prev) => prev.filter(r => r.id !== reviewId));
+    } catch (err) {
+      console.error(err);
+      alert('Unable to delete review.');
     }
   };
 
@@ -323,7 +349,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </div>
               <h1 style={{ fontSize: '1.75rem', fontWeight: 600, marginBottom: '0.5rem', letterSpacing: '-0.02em', lineHeight: 1.25 }}>{product.name}</h1>
 
-              {Array.isArray(product.vendor_id) && (
+              {product.has_vendor_company && Array.isArray(product.vendor_id) && (
                 <p style={{ color: COLOR_PALETTE.textSecondary, fontSize: '0.85rem', marginBottom: '1rem' }}>
                   Supplied by <strong style={{ color: COLOR_PALETTE.textDark }}>{product.vendor_id[1]}</strong>
                 </p>
@@ -524,6 +550,36 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           </motion.button>
         </div>
       </motion.div>
+
+      {/* Reviews Section */}
+      <div style={{ marginTop: '3rem', padding: '2rem 0', borderTop: '1px solid var(--border-light)' }}>
+        <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Customer Reviews</h3>
+        {reviews.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)' }}>No reviews yet for this product.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {reviews.map((review) => (
+              <div key={review.id} style={{ padding: '1.5rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-white)', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                  <div>
+                    <div style={{ color: '#f59e0b', fontSize: '1.1rem', marginBottom: '0.25rem' }}>
+                      {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                    </div>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem' }}>{review.reviewer_name}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
+                      {new Date(review.create_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {review.can_delete && (
+                    <button type="button" onClick={() => handleDeleteReview(review.id)} style={{ color: '#ef4444', background: 'none', border: 'none', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}>Delete Review</button>
+                  )}
+                </div>
+                {review.review_text && <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.85rem', lineHeight: 1.5 }}>{review.review_text}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

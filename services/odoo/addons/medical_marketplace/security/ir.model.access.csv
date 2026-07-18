@@ -1,3 +1,11 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_medical_return_request_admin,medical.return.request admin,model_medical_return_request,group_marketplace_admin,1,1,1,1
-access_medical_return_request_user,medical.return.request internal user,model_medical_return_request,base.group_user,1,1,1,0
+access_medical_return_request_admin,medical.return.request admin,model_medical_return_request,medical_marketplace.group_marketplace_admin,1,1,1,1
+access_medical_return_request_portal,medical.return.request portal,model_medical_return_request,base.group_portal,1,0,1,0
+access_medical_return_reason_admin,medical.return.reason admin,model_medical_return_reason,medical_marketplace.group_marketplace_admin,1,1,1,1
+access_medical_return_reason_portal,medical.return.reason portal,model_medical_return_reason,base.group_portal,1,0,0,0
+access_medical_return_reason_user,medical.return.reason internal,model_medical_return_reason,base.group_user,1,0,0,0
+access_medical_carrier_admin,medical.carrier admin,model_medical_carrier,medical_marketplace.group_marketplace_admin,1,1,1,1
+access_medical_carrier_portal,medical.carrier portal,model_medical_carrier,base.group_portal,1,0,0,0
+access_medical_carrier_user,medical.carrier internal,model_medical_carrier,base.group_user,1,0,0,0
+access_medical_order_review_admin,medical.order.review admin,model_medical_order_review,medical_marketplace.group_marketplace_admin,1,1,1,1
+access_medical_order_review_portal,medical.order.review portal,model_medical_order_review,base.group_portal,1,0,1,1

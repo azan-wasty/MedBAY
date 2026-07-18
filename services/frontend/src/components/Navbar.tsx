@@ -101,7 +101,7 @@ export default function Navbar() {
               // Hide dashboard/returns if not logged in, hide Admin if not an admin
               if (link.path === '/dashboard' && !user) return null;
               if (link.path === '/returns' && !user) return null;
-              if (link.path === '/admin/companies' && !user?.is_admin) return null;
+              if ((link.path === '/admin' || link.path === '/admin/companies') && !user?.is_admin) return null;
 
               const isActive = pathname === link.path;
               return (

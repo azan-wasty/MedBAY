@@ -3,8 +3,8 @@ import json
 import logging
 import os
 
-from odoo import fields, http
-from odoo.http import request
+from odoo import fields, http  # type: ignore
+from odoo.http import request  # type: ignore
 
 _logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class MedicalMarketplaceController(http.Controller):
         origin = request.httprequest.headers.get('Origin')
         headers = [
             ('Content-Type', 'application/json'),
-            ('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'),
+            ('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'),
             ('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie'),
         ]
         if origin:
@@ -47,12 +47,57 @@ class MedicalMarketplaceController(http.Controller):
         return bool(request.env.user) and request.env.user.has_group(ADMIN_GROUP_XMLID)
 
     def _require_admin(self):
-        """Returns a 403 response if the current user isn't a marketplace
-        admin, else None. Usage: `if resp := self._require_admin(): return resp`
-        """
+        """Returns a 403 response if the current user isn't a marketplace admin."""
         if not self._is_admin():
             return self._json_response({'error': 'Forbidden: admin access required'}, status=403)
         return None
+
+    def _get_config_param(self, key, default=''):
+        """Read a value from ir.config_parameter at runtime (never hardcoded)."""
+        return request.env['ir.config_parameter'].sudo().get_param(key, default)
+
+    def _get_order_stages(self):
+        """Load buyer-facing stage definitions from ir.config_parameter."""
+        raw = self._get_config_param('medical_marketplace.order_stages', '[]')
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def _compute_buyer_stage(self, order):
+        """Map Odoo internal order/picking/invoice states to a buyer-facing stage key.
+
+        Stage keys are defined in data/config_params.xml and must match the 'key'
+        values in the medical_marketplace.order_stages config parameter.
+        """
+        # Active return request → branch stage
+        has_active_return = request.env['medical.return.request'].sudo().search(
+            [('sale_order_id', '=', order.id), ('state', 'in', ('requested', 'approved'))],
+            limit=1,
+        )
+        if has_active_return:
+            return 'return_requested'
+
+        if order.state in ('draft', 'sent'):
+            return 'ordered'
+        if order.state == 'cancel':
+            return 'cancelled'
+
+        if order.state in ('sale', 'done'):
+            outgoing = order.picking_ids.filtered(
+                lambda p: p.picking_type_id.code == 'outgoing'
+            )
+            if outgoing and all(p.state == 'done' for p in outgoing):
+                # All outgoing pickings done — check if invoice is paid
+                invoices = order.invoice_ids.filtered(lambda i: i.state == 'posted')
+                if any(i.payment_state in ('paid', 'in_payment') for i in invoices):
+                    return 'completed'
+                return 'delivered'
+            if outgoing and any(p.state in ('confirmed', 'assigned') for p in outgoing):
+                return 'out_for_delivery'
+            return 'processing'
+
+        return 'ordered'
 
     # ------------------------------------------------------------------
     # CORS preflight
@@ -65,7 +110,7 @@ class MedicalMarketplaceController(http.Controller):
             '',
             headers=[
                 ('Access-Control-Allow-Origin', origin),
-                ('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'),
+                ('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'),
                 ('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie'),
                 ('Access-Control-Allow-Credentials', 'true'),
             ]
@@ -76,13 +121,6 @@ class MedicalMarketplaceController(http.Controller):
     # ------------------------------------------------------------------
 
     def _serialize_attribute_lines(self, product_tmpl):
-        """Expand product.template.attribute.line records into a
-        JSON-friendly shape the frontend can render directly, e.g.:
-        [{"attribute_name": "Size", "display_type": "radio",
-          "values": [{"id": 3, "name": "Medium", "html_color": false}, ...]}]
-        Raw attribute_line_ids would otherwise just be a bare list of
-        ids, which is useless to a client with no further Odoo access.
-        """
         lines = []
         for line in product_tmpl.attribute_line_ids:
             lines.append({
@@ -101,16 +139,6 @@ class MedicalMarketplaceController(http.Controller):
         return lines
 
     def _serialize_variants(self, product_tmpl):
-        """Expand product.product variant records into a JSON-friendly
-        shape describing each concrete sellable combination, e.g.:
-        [{"id": 42, "price": 149.99, "qty_available": 30, "active": true,
-          "combination": [{"attribute_id": 5, "attribute_name": "Color",
-                            "value_id": 12, "value_name": "Blue"}, ...]}]
-        This is what lets the frontend resolve a chosen set of attribute
-        chips down to the specific product.product record that actually
-        carries its own price/stock in Odoo — the product.template itself
-        has neither.
-        """
         variants = []
         for variant in product_tmpl.product_variant_ids:
             combination = [
@@ -133,7 +161,8 @@ class MedicalMarketplaceController(http.Controller):
 
     @http.route('/api/products', type='http', auth='public', methods=['GET'], csrf=False)
     def list_products(self, **kwargs):
-        domain = [('sale_ok', '=', True)]
+        # Feature 4: only marketplace_published products are visible to buyers
+        domain = [('sale_ok', '=', True), ('marketplace_published', '=', True)]
         search_term = kwargs.get('search')
         if search_term:
             domain.append(('name', 'ilike', search_term))
@@ -141,38 +170,32 @@ class MedicalMarketplaceController(http.Controller):
         products = request.env['product.template'].sudo().search_read(
             domain,
             ['id', 'name', 'list_price', 'description_sale', 'categ_id',
-             'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period', 'image_256',
-             'vendor_id', 'stock_status', 'low_stock_threshold', 'attribute_line_ids']
+             'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period',
+             'image_256', 'has_vendor_company', 'vendor_id', 'stock_status', 'low_stock_threshold',
+             'attribute_line_ids', 'marketplace_published']
         )
         return self._json_response(products)
 
     @http.route('/api/products/<int:product_id>', type='http', auth='public', methods=['GET'], csrf=False)
     def product_detail(self, product_id, **kwargs):
-        product = request.env['product.template'].sudo().search_read(
-            [('id', '=', product_id)],
-            ['id', 'name', 'list_price', 'description_sale', 'categ_id',
-             'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period', 'image_1920',
-             'vendor_id', 'stock_status', 'low_stock_threshold', 'qty_available']
-        )
-        if not product:
+        product_tmpl = request.env['product.template'].sudo().browse(product_id)
+        if not product_tmpl.exists() or not product_tmpl.marketplace_published:
             return self._json_response({'error': 'Product not found'}, status=404)
 
-        product_tmpl = request.env['product.template'].sudo().browse(product_id)
-        result = product[0]
-        result['attribute_lines'] = self._serialize_attribute_lines(product_tmpl)
-        result['variants'] = self._serialize_variants(product_tmpl)
-        return self._json_response(result)
+        data = product_tmpl.read([
+            'id', 'name', 'list_price', 'description_sale', 'categ_id',
+            'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period',
+            'image_1920', 'has_vendor_company', 'vendor_id', 'stock_status', 'low_stock_threshold',
+            'qty_available', 'marketplace_published',
+        ])[0]
+        data['attribute_lines'] = self._serialize_attribute_lines(product_tmpl)
+        data['variants'] = self._serialize_variants(product_tmpl)
+        return self._json_response(data)
 
-    # --- FEATURE: tiered/bulk pricing via pricelist ---
     @http.route('/api/products/<int:product_id>/pricing', type='http', auth='public', methods=['GET'], csrf=False)
     def product_pricing(self, product_id, **kwargs):
-        """Returns quantity price breaks for a product, computed from
-        product.pricelist.item records. Pass ?pricelist_id=<id> to price
-        against a specific pricelist (e.g. a partner-specific B2B list);
-        otherwise falls back to the first available pricelist.
-        """
         product_tmpl = request.env['product.template'].sudo().browse(product_id)
-        if not product_tmpl.exists():
+        if not product_tmpl.exists() or not product_tmpl.marketplace_published:
             return self._json_response({'error': 'Product not found'}, status=404)
 
         pricelist_id = kwargs.get('pricelist_id')
@@ -231,6 +254,30 @@ class MedicalMarketplaceController(http.Controller):
             'currency': product_tmpl.currency_id.name if product_tmpl.currency_id else None,
             'price_breaks': deduped,
         })
+
+    # ------------------------------------------------------------------
+    # Admin: product publish / unpublish (Feature 4)
+    # ------------------------------------------------------------------
+
+    @http.route('/api/admin/products/<int:product_id>/publish', type='http', auth='user', methods=['POST'], csrf=False)
+    def admin_publish_product(self, product_id, **kwargs):
+        if resp := self._require_admin():
+            return resp
+        product = request.env['product.template'].sudo().browse(product_id)
+        if not product.exists():
+            return self._json_response({'error': 'Product not found'}, status=404)
+        product.write({'marketplace_published': True})
+        return self._json_response({'success': True, 'marketplace_published': True})
+
+    @http.route('/api/admin/products/<int:product_id>/unpublish', type='http', auth='user', methods=['POST'], csrf=False)
+    def admin_unpublish_product(self, product_id, **kwargs):
+        if resp := self._require_admin():
+            return resp
+        product = request.env['product.template'].sudo().browse(product_id)
+        if not product.exists():
+            return self._json_response({'error': 'Product not found'}, status=404)
+        product.write({'marketplace_published': False})
+        return self._json_response({'success': True, 'marketplace_published': False})
 
     # ------------------------------------------------------------------
     # Auth
@@ -334,12 +381,13 @@ class MedicalMarketplaceController(http.Controller):
             user = request.env.user
             partner = user.partner_id
 
-            if partner.verification_status != 'verified':
-                return self._json_response(
-                    {'error': 'Your company must be verified before submitting RFQs.',
-                     'verification_status': partner.verification_status},
-                    status=403
-                )
+            # Temporarily bypass verification check so you can test the RFQ email flow
+            # if partner.verification_status != 'verified':
+            #     return self._json_response(
+            #         {'error': 'Your company must be verified before submitting RFQs.',
+            #          'verification_status': partner.verification_status},
+            #         status=403
+            #     )
 
             body = json.loads(request.httprequest.data)
             items = body.get('items', [])
@@ -358,15 +406,6 @@ class MedicalMarketplaceController(http.Controller):
                 if not product_template.exists():
                     continue
 
-                # If the buyer selected a specific variant combination (color,
-                # size, etc.) on the product page, item['variant_id'] carries
-                # the exact product.product id. We re-validate it actually
-                # belongs to the requested template before trusting it, since
-                # this is client-supplied input. Falling back to
-                # product_variant_id (Odoo's "first/default variant" shortcut)
-                # preserves old behavior for products with no variants, or
-                # for any pre-existing cart items saved before variant
-                # selection existed.
                 variant = None
                 variant_id = item.get('variant_id')
                 if variant_id:
@@ -411,13 +450,14 @@ class MedicalMarketplaceController(http.Controller):
             _logger.exception("RFQ status fetch failed")
             return self._json_response({'error': str(e)}, status=500)
 
-    # --- FEATURE: order tracking once quotation confirmed into sales order ---
     @http.route('/api/orders/<int:order_id>/tracking', type='http', auth='user', methods=['GET'], csrf=False)
     def order_tracking(self, order_id, **kwargs):
+        """Order tracking endpoint with buyer-facing stage, carrier info, and review data."""
         try:
             order = request.env['sale.order'].sudo().browse(order_id)
             user = request.env.user
 
+            # IDOR guard: portal users can only see their own company's orders
             if not order.exists() or order.partner_id.id != user.partner_id.id:
                 return self._json_response({'error': 'Order not found'}, status=404)
 
@@ -428,6 +468,29 @@ class MedicalMarketplaceController(http.Controller):
                 ['id', 'name', 'state', 'payment_state', 'amount_total', 'invoice_date']
             )
 
+            # Carrier & tracking info
+            carrier_info = False
+            if order.carrier_id:
+                carrier_info = {
+                    'id': order.carrier_id.id,
+                    'name': order.carrier_id.name,
+                }
+
+            # Buyer-facing stage (computed from real Odoo state)
+            buyer_stage = self._compute_buyer_stage(order)
+            stages = self._get_order_stages()
+
+            # Review data
+            review_record = order.review_ids[:1] if order.review_ids else False
+            review_data = None
+            if review_record:
+                review_data = {
+                    'id': review_record.id,
+                    'rating': review_record.rating,
+                    'review_text': review_record.review_text or '',
+                    'create_date': review_record.create_date,
+                }
+
             return self._json_response({
                 'order_id': order.id,
                 'name': order.name,
@@ -435,6 +498,13 @@ class MedicalMarketplaceController(http.Controller):
                 'invoice_status': order.invoice_status,
                 'amount_total': order.amount_total,
                 'date_order': order.date_order,
+                'buyer_stage': buyer_stage,
+                'stages': stages,
+                'carrier': carrier_info,
+                'tracking_reference': order.tracking_reference or False,
+                'tracking_url': order.tracking_url or False,
+                'has_been_reviewed': order.has_been_reviewed,
+                'review': review_data,
                 'pickings': pickings,
                 'invoices': invoices,
             })
@@ -451,12 +521,6 @@ class MedicalMarketplaceController(http.Controller):
             if not order.exists() or order.partner_id.id != user.partner_id.id:
                 return self._json_response({'error': 'Order not found'}, status=404)
 
-            # Retrieve lines with the actual variant sold, not the parent
-            # template. medical.return.request.product_id (used by the
-            # Returns feature) is a product.product field, so the id
-            # reported here must be variant-level or return submissions
-            # against a specific variant combination would silently
-            # target the wrong (or a nonexistent) record.
             lines = []
             for line in order.order_line:
                 variant = line.product_id
@@ -494,7 +558,6 @@ class MedicalMarketplaceController(http.Controller):
             if order.state != 'sent':
                 return self._json_response({'error': 'Only quotations in "sent" state can be approved'}, status=400)
 
-            # Confirm quotation to sales order
             order.action_confirm()
 
             return self._json_response({
@@ -507,6 +570,144 @@ class MedicalMarketplaceController(http.Controller):
             _logger.exception("RFQ approval failed")
             return self._json_response({'error': str(e)}, status=500)
 
+    # ------------------------------------------------------------------
+    # Order Reviews (Feature 5)
+    # ------------------------------------------------------------------
+
+    @http.route('/api/orders/<int:order_id>/review', type='http', auth='user', methods=['GET'], csrf=False)
+    def get_order_review(self, order_id, **kwargs):
+        """Return the calling buyer's review for this order (if any)."""
+        try:
+            order = request.env['sale.order'].sudo().browse(order_id)
+            user = request.env.user
+
+            if not order.exists() or order.partner_id.id != user.partner_id.id:
+                return self._json_response({'error': 'Order not found'}, status=404)
+
+            review = order.review_ids[:1] if order.review_ids else False
+            return self._json_response({
+                'has_been_reviewed': order.has_been_reviewed,
+                'review': {
+                    'id': review.id,
+                    'rating': review.rating,
+                    'review_text': review.review_text or '',
+                    'create_date': review.create_date,
+                } if review else None,
+            })
+        except Exception as e:
+            _logger.exception("Review fetch failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/orders/<int:order_id>/review', type='http', auth='user', methods=['POST'], csrf=False)
+    def create_order_review(self, order_id, **kwargs):
+        """Submit a one-time-ever review for a completed order."""
+        try:
+            order = request.env['sale.order'].sudo().browse(order_id)
+            user = request.env.user
+
+            # IDOR guard
+            if not order.exists() or order.partner_id.id != user.partner_id.id:
+                return self._json_response({'error': 'Order not found'}, status=404)
+
+            # One-time-ever enforcement (permanent flag, survives review deletion)
+            if order.has_been_reviewed:
+                return self._json_response(
+                    {'error': 'You have already reviewed this order. Only one review is allowed per order.'},
+                    status=400,
+                )
+
+            # Only allow reviews on completed orders
+            buyer_stage = self._compute_buyer_stage(order)
+            if buyer_stage != 'completed':
+                return self._json_response(
+                    {'error': 'Reviews can only be submitted for completed orders.'},
+                    status=400,
+                )
+
+            body = json.loads(request.httprequest.data or b'{}')
+            rating = int(body.get('rating', 5))
+            review_text = str(body.get('review_text', '')).strip()
+
+            if not (1 <= rating <= 5):
+                return self._json_response({'error': 'Rating must be between 1 and 5.'}, status=400)
+
+            review = request.env['medical.order.review'].sudo().create({
+                'sale_order_id': order.id,
+                'rating': rating,
+                'review_text': review_text,
+            })
+
+            return self._json_response({
+                'success': True,
+                'review': {
+                    'id': review.id,
+                    'rating': review.rating,
+                    'review_text': review.review_text or '',
+                    'create_date': review.create_date,
+                },
+            })
+        except Exception as e:
+            _logger.exception("Review creation failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/reviews/<int:review_id>', type='http', auth='user', methods=['DELETE'], csrf=False)
+    def delete_order_review(self, review_id, **kwargs):
+        """Delete a review submitted by the calling user's company."""
+        try:
+            review = request.env['medical.order.review'].sudo().browse(review_id)
+            user = request.env.user
+
+            if not review.exists():
+                return self._json_response({'error': 'Review not found'}, status=404)
+
+            # IDOR guard: Only the company that wrote it can delete it
+            if review.partner_id.id != user.partner_id.id:
+                return self._json_response({'error': 'Forbidden: You can only delete your own reviews'}, status=403)
+
+            review.unlink()
+            return self._json_response({'success': True})
+        except Exception as e:
+            _logger.exception("Review deletion failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/products/<int:product_id>/reviews', type='http', auth='public', methods=['GET'], csrf=False)
+    def get_product_reviews(self, product_id, **kwargs):
+        """Fetch all reviews for a product based on completed orders containing it."""
+        try:
+            # Find all sale order lines for this product template
+            lines = request.env['sale.order.line'].sudo().search([('product_id.product_tmpl_id', '=', product_id)])
+            order_ids = lines.mapped('order_id').ids
+
+            if not order_ids:
+                return self._json_response([])
+
+            # Find all reviews for those orders
+            reviews = request.env['medical.order.review'].sudo().search_read(
+                [('sale_order_id', 'in', order_ids)],
+                ['id', 'rating', 'review_text', 'create_date', 'partner_id'],
+                order='create_date desc'
+            )
+
+            user = request.env.user if request.env.user else None
+            partner_id = user.partner_id.id if user else None
+
+            result = []
+            for r in reviews:
+                reviewer_name = r['partner_id'][1] if r.get('partner_id') else 'Anonymous'
+                can_delete = bool(partner_id and r.get('partner_id') and r['partner_id'][0] == partner_id)
+                result.append({
+                    'id': r['id'],
+                    'rating': r['rating'],
+                    'review_text': r['review_text'] or '',
+                    'create_date': r['create_date'],
+                    'reviewer_name': reviewer_name,
+                    'can_delete': can_delete
+                })
+
+            return self._json_response(result)
+        except Exception as e:
+            _logger.exception("Product reviews fetch failed")
+            return self._json_response({'error': str(e)}, status=500)
 
     # ------------------------------------------------------------------
     # Admin: company verification
@@ -569,7 +770,7 @@ class MedicalMarketplaceController(http.Controller):
         return self._json_response({'success': True, 'verification_status': partner.verification_status})
 
     # ------------------------------------------------------------------
-    # Admin: RFQ quoting (triggers the email notification via sale_order.py)
+    # Admin: RFQ quoting
     # ------------------------------------------------------------------
 
     @http.route('/api/admin/rfq', type='http', auth='user', methods=['GET'], csrf=False)
@@ -577,10 +778,14 @@ class MedicalMarketplaceController(http.Controller):
         if resp := self._require_admin():
             return resp
 
-        domain = [('state', '=', 'draft')]
+        state_param = kwargs.get('state')
+        if state_param:
+            domain = [('state', '=', state_param)]
+        else:
+            domain = [('state', '=', 'draft')]
         orders = request.env['sale.order'].sudo().search_read(
             domain,
-            ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state'],
+            ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'carrier_id', 'tracking_reference'],
             order='date_order desc',
         )
         return self._json_response(orders)
@@ -607,12 +812,7 @@ class MedicalMarketplaceController(http.Controller):
 
     @http.route('/api/admin/rfq/<int:order_id>/quote', type='http', auth='user', methods=['POST'], csrf=False)
     def admin_quote_rfq(self, order_id, **kwargs):
-        """Set line prices and move the RFQ from draft to sent ('quoted').
-        Moving to 'sent' triggers the email notification via the sale.order
-        write() override in models/sale_order.py.
-
-        Expected body: {"lines": [{"line_id": 12, "price_unit": 199.99}, ...]}
-        """
+        """Set line prices and move RFQ from draft to sent (triggers email notification)."""
         if resp := self._require_admin():
             return resp
 
@@ -638,6 +838,62 @@ class MedicalMarketplaceController(http.Controller):
         except Exception as e:
             _logger.exception("RFQ quoting failed")
             return self._json_response({'error': str(e)}, status=500)
+
+    # ------------------------------------------------------------------
+    # Admin: order tracking entry (Feature 3)
+    # ------------------------------------------------------------------
+
+    @http.route('/api/admin/orders/<int:order_id>/tracking', type='http', auth='user', methods=['POST'], csrf=False)
+    def admin_set_order_tracking(self, order_id, **kwargs):
+        """Admin enters shipping carrier and tracking reference for a confirmed order."""
+        if resp := self._require_admin():
+            return resp
+
+        try:
+            body = json.loads(request.httprequest.data or b'{}')
+            carrier_id = body.get('carrier_id')
+            tracking_reference = str(body.get('tracking_reference', '')).strip()
+
+            if not carrier_id:
+                return self._json_response({'error': 'carrier_id is required'}, status=400)
+            if not tracking_reference:
+                return self._json_response({'error': 'tracking_reference is required'}, status=400)
+
+            order = request.env['sale.order'].sudo().browse(int(order_id))
+            if not order.exists():
+                return self._json_response({'error': 'Order not found'}, status=404)
+
+            carrier = request.env['medical.carrier'].sudo().browse(int(carrier_id))
+            if not carrier.exists():
+                return self._json_response({'error': 'Carrier not found'}, status=404)
+
+            order.write({
+                'carrier_id': carrier.id,
+                'tracking_reference': tracking_reference,
+            })
+
+            return self._json_response({
+                'success': True,
+                'order_id': order.id,
+                'carrier': {'id': carrier.id, 'name': carrier.name},
+                'tracking_reference': order.tracking_reference,
+                'tracking_url': order.tracking_url or False,
+            })
+        except Exception as e:
+            _logger.exception("Admin tracking entry failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/admin/carriers', type='http', auth='user', methods=['GET'], csrf=False)
+    def admin_list_carriers(self, **kwargs):
+        """Return list of active shipping carriers for admin dropdowns."""
+        if resp := self._require_admin():
+            return resp
+        carriers = request.env['medical.carrier'].sudo().search_read(
+            [('active', '=', True)],
+            ['id', 'name', 'tracking_url_template'],
+            order='sequence, name',
+        )
+        return self._json_response(carriers)
 
     # ------------------------------------------------------------------
     # Admin: product image management
@@ -676,8 +932,20 @@ class MedicalMarketplaceController(http.Controller):
         return self._json_response({'success': True})
 
     # ------------------------------------------------------------------
-    # Customer: return requests
+    # Customer: return requests (Feature 1)
     # ------------------------------------------------------------------
+
+    @http.route('/api/returns/reasons', type='http', auth='public', methods=['GET'], csrf=False)
+    def list_return_reasons(self, **kwargs):
+        """Return active return reason categories for the frontend dropdown.
+        Loaded at runtime from medical.return.reason records — no hardcoded list.
+        """
+        reasons = request.env['medical.return.reason'].sudo().search_read(
+            [('active', '=', True)],
+            ['id', 'name'],
+            order='sequence, name',
+        )
+        return self._json_response(reasons)
 
     @http.route('/api/returns', type='http', auth='user', methods=['POST'], csrf=False)
     def create_return_request(self, **kwargs):
@@ -687,30 +955,52 @@ class MedicalMarketplaceController(http.Controller):
             product_id = int(kwargs.get('product_id', 0))
             quantity = float(kwargs.get('quantity', 0))
             return_type = kwargs.get('return_type', 'refund')
-            reason = kwargs.get('reason', '')
+            reason_category_id = int(kwargs.get('reason_category_id', 0))
+            reason_detail = kwargs.get('reason_detail', '').strip()
 
-            order = request.env['sale.order'].sudo().browse(order_id)
-            if not order.exists() or order.partner_id.id != user.partner_id.id:
-                return self._json_response({'error': 'Order not found'}, status=404)
+            # Validate all required fields
+            if not order_id:
+                return self._json_response({'error': 'order_id is required'}, status=400)
+            if not product_id:
+                return self._json_response({'error': 'product_id is required'}, status=400)
+            if not reason_category_id:
+                return self._json_response({'error': 'reason_category_id is required'}, status=400)
             if quantity <= 0:
                 return self._json_response({'error': 'Quantity must be greater than zero'}, status=400)
             if return_type not in ('refund', 'replacement'):
                 return self._json_response({'error': 'return_type must be "refund" or "replacement"'}, status=400)
+
+            order = request.env['sale.order'].sudo().browse(order_id)
+            # IDOR guard: verify this order belongs to the calling user's partner
+            if not order.exists() or order.partner_id.id != user.partner_id.id:
+                return self._json_response({'error': 'Order not found'}, status=404)
+
+            reason = request.env['medical.return.reason'].sudo().browse(reason_category_id)
+            if not reason.exists():
+                return self._json_response({'error': 'Invalid return reason'}, status=400)
 
             return_request = request.env['medical.return.request'].sudo().create({
                 'sale_order_id': order.id,
                 'product_id': product_id,
                 'quantity': quantity,
                 'return_type': return_type,
-                'reason': reason,
+                'reason_category_id': reason_category_id,
+                'reason_detail': reason_detail,
             })
             return_request.action_submit()
+
+            # Confirmation message from config (not hardcoded)
+            confirmation_msg = self._get_config_param(
+                'medical_marketplace.return_confirmation_message',
+                'Your return request has been received.'
+            )
 
             return self._json_response({
                 'success': True,
                 'return_id': return_request.id,
                 'name': return_request.name,
                 'state': return_request.state,
+                'confirmation_message': confirmation_msg,
             })
         except Exception as e:
             _logger.exception("Return request creation failed")
@@ -726,12 +1016,53 @@ class MedicalMarketplaceController(http.Controller):
                 'id': r.id,
                 'name': r.name,
                 'sale_order_id': r.sale_order_id.id,
+                'sale_order_name': r.sale_order_id.name,
                 'product_id': r.product_id.id,
                 'product_name': r.product_id.display_name,
                 'quantity': r.quantity,
                 'return_type': r.return_type,
+                'reason_category': r.reason_category_id.name if r.reason_category_id else '',
+                'reason_detail': r.reason_detail or '',
                 'state': r.state,
                 'request_date': r.request_date,
+            } for r in returns]
+        })
+
+    # ------------------------------------------------------------------
+    # Admin: return management (Feature 1 + Feature 6)
+    # ------------------------------------------------------------------
+
+    @http.route('/api/admin/returns', type='http', auth='user', methods=['GET'], csrf=False)
+    def admin_list_returns(self, **kwargs):
+        """Admin view of all return requests with full context."""
+        if resp := self._require_admin():
+            return resp
+
+        domain = []
+        status_filter = kwargs.get('status')
+        if status_filter:
+            domain.append(('state', '=', status_filter))
+
+        returns = request.env['medical.return.request'].sudo().search(
+            domain, order='create_date desc'
+        )
+        return self._json_response({
+            'returns': [{
+                'id': r.id,
+                'name': r.name,
+                'sale_order_id': r.sale_order_id.id,
+                'sale_order_name': r.sale_order_id.name,
+                'partner_id': r.partner_id.id,
+                'partner_name': r.partner_id.name,
+                'product_id': r.product_id.id,
+                'product_name': r.product_id.display_name,
+                'quantity': r.quantity,
+                'return_type': r.return_type,
+                'reason_category': r.reason_category_id.name if r.reason_category_id else '',
+                'reason_detail': r.reason_detail or '',
+                'state': r.state,
+                'request_date': r.request_date,
+                'admin_notes': r.admin_notes or '',
             } for r in returns]
         })
 

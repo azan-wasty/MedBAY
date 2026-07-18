@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Product form: Medical B2B fields + publish toggle + sourcing company -->
     <record id="product_template_only_form_view_medical" model="ir.ui.view">
         <field name="name">product.template.product.form.medical</field>
         <field name="model">product.template</field>
@@ -13,9 +14,11 @@
                     <field name="warranty_period"/>
                 </group>
                 <group string="B2B Vendor Company">
-                    <field name="vendor_id"/>
-                    <field name="seller_ids"/>
+                    <field name="has_vendor_company"/>
+                    <field name="vendor_id" invisible="not has_vendor_company"/>
+                    <field name="seller_ids" invisible="not has_vendor_company"/>
                 </group>
+
                 <group string="Stock">
                     <field name="type"/>
                     <field name="qty_available"/>
@@ -25,10 +28,14 @@
                            decoration-warning="stock_status == 'low_stock'"
                            decoration-danger="stock_status == 'out_of_stock'"/>
                 </group>
+                <group string="Marketplace">
+                    <field name="marketplace_published" widget="boolean_toggle"/>
+                </group>
             </xpath>
         </field>
     </record>
 
+    <!-- Partner form: verification fields -->
     <record id="view_partner_form_medical" model="ir.ui.view">
         <field name="name">res.partner.form.medical</field>
         <field name="model">res.partner</field>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Runtime configuration parameters for the Medical Marketplace addon.
+        Change values via Settings > Technical > Parameters > System Parameters
+        without touching code, templates, or restarting Odoo.
+    -->
+    <data noupdate="1">
+
+        <!-- Message shown to buyer after a return request is submitted -->
+        <record id="param_return_confirmation" model="ir.config_parameter">
+            <field name="key">medical_marketplace.return_confirmation_message</field>
+            <field name="value">Your return request has been received. Our customer service team will contact you shortly.</field>
+        </record>
+
+        <!--
+            Ordered list of buyer-facing order stage labels.
+            Keys must match the buyer_stage values computed in controllers/main.py.
+            To relabel a stage, update "label" here — no code changes needed.
+            JSON format: [{"key": "...", "label": "..."}]
+        -->
+        <record id="param_order_stages" model="ir.config_parameter">
+            <field name="key">medical_marketplace.order_stages</field>
+            <field name="value">[{"key":"ordered","label":"Order Placed"},{"key":"processing","label":"Confirmed \/ Processing"},{"key":"out_for_delivery","label":"Out for Delivery"},{"key":"delivered","label":"Delivered"},{"key":"completed","label":"Completed"},{"key":"return_requested","label":"Return Requested"},{"key":"cancelled","label":"Cancelled"}]</field>
+        </record>
+
+    </data>
+</odoo>

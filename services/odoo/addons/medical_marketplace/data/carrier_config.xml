@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Shipping carrier registry with per-carrier tracking URL templates.
+
+        HOW TO ADD A NEW CARRIER:
+        1. Copy one of the <record> blocks below.
+        2. Give it a unique id (e.g. id="carrier_tcs").
+        3. Set the carrier name and tracking_url_template.
+           Use {tracking_id} as the placeholder for the shipment reference.
+        4. Run 'Upgrade' on the Medical Marketplace module.
+
+        noupdate="1" means these seed records survive module upgrades.
+        Admins can also edit carriers directly in the Odoo backend under
+        Medical Marketplace > Configuration > Shipping Carriers.
+    -->
+    <data noupdate="1">
+
+        <record id="carrier_dhl" model="medical.carrier">
+            <field name="name">DHL Express</field>
+            <field name="tracking_url_template">https://www.dhl.com/en/express/tracking.html?AWB={tracking_id}</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="carrier_fedex" model="medical.carrier">
+            <field name="name">FedEx</field>
+            <field name="tracking_url_template">https://www.fedex.com/fedextrack/?trknbr={tracking_id}</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="carrier_ups" model="medical.carrier">
+            <field name="name">UPS</field>
+            <field name="tracking_url_template">https://www.ups.com/track?tracknum={tracking_id}</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="carrier_aramex" model="medical.carrier">
+            <field name="name">Aramex</field>
+            <field name="tracking_url_template">https://www.aramex.com/us/en/track/results?ShipmentNumber={tracking_id}</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="carrier_tcs" model="medical.carrier">
+            <field name="name">TCS Courier</field>
+            <field name="tracking_url_template">https://www.tcscourier.com.pk/Tracking/status.aspx?Shipment={tracking_id}</field>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="carrier_leopards" model="medical.carrier">
+            <field name="name">Leopards Courier</field>
+            <field name="tracking_url_template">https://leopardscourier.com/track-your-parcel/?track_number={tracking_id}</field>
+            <field name="sequence">60</field>
+        </record>
+
+    </data>
+</odoo>

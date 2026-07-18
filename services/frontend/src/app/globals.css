@@ -1041,3 +1041,120 @@ img { max-width: 100%; height: auto; }
   gap: 0.75rem;
 }
 
+/* ---------- Order Stepper Styling ---------- */
+.order-stepper {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 0 1rem;
+}
+
+.order-stepper::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: 2rem;
+  right: 2rem;
+  height: 2px;
+  background-color: var(--border-light);
+  z-index: 1;
+}
+
+.stepper-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.stepper-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--bg-white);
+  border: 2px solid var(--border-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  transition: var(--transition-smooth);
+  color: var(--text-muted);
+}
+
+.stepper-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  max-width: 120px;
+  word-wrap: break-word;
+}
+
+/* Completed Step state */
+.stepper-step.completed {
+  color: var(--success);
+}
+.stepper-step.completed .stepper-icon {
+  background-color: var(--success);
+  border-color: var(--success);
+  color: var(--bg-white);
+}
+
+/* Active Step state */
+.stepper-step.active {
+  color: var(--primary);
+}
+.stepper-step.active .stepper-icon {
+  background-color: var(--bg-white);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+  font-weight: bold;
+}
+
+/* ---------- Responsive Breakpoints ---------- */
+@media (max-width: 768px) {
+  .order-stepper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 0;
+  }
+
+  .order-stepper::before {
+    top: 1rem;
+    bottom: 1rem;
+    left: 18px;
+    width: 2px;
+    height: auto;
+  }
+
+  .stepper-step {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+    text-align: left;
+    width: 100%;
+  }
+
+  .stepper-icon {
+    margin-bottom: 0;
+  }
+
+  .stepper-label {
+    max-width: none;
+  }
+  
+  /* Modal responsiveness */
+  .modal-content {
+    width: 95% !important;
+    margin: 1rem;
+    max-height: 90vh;
+  }
+}
+
+

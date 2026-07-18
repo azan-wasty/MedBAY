@@ -194,7 +194,10 @@ export const ADMIN_COMPANIES_LABELS = {
   forbiddenMsg: "You must be a marketplace admin to view this page.",
 };
 
-// High-quality mock catalog data used as a fallback if Odoo has no records
+// High-quality mock catalog data used as a fallback if Odoo has no records.
+// Shaped to match the current Product/AttributeLine/ProductVariant types in
+// odooClient.ts. Mock attribute/value ids use a 9000+ range so they can
+// never collide with real Odoo-assigned ids.
 export const MOCK_PRODUCTS = [
   {
     id: 1,
@@ -208,6 +211,11 @@ export const MOCK_PRODUCTS = [
     warranty_period: "3 Years",
     image_256: "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80",
     image_1920: "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80",
+    vendor_id: [9101, "Aura Medical Systems"] as [number, string],
+    stock_status: "in_stock" as const,
+    low_stock_threshold: 2,
+    qty_available: 4,
+    attribute_line_ids: [] as number[],
   },
   {
     id: 2,
@@ -221,6 +229,11 @@ export const MOCK_PRODUCTS = [
     warranty_period: "2 Years",
     image_256: "https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=600&q=80",
     image_1920: "https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80",
+    vendor_id: [9102, "Medisurge Corp."] as [number, string],
+    stock_status: "low_stock" as const,
+    low_stock_threshold: 5,
+    qty_available: 3,
+    attribute_line_ids: [] as number[],
   },
   {
     id: 3,
@@ -234,6 +247,11 @@ export const MOCK_PRODUCTS = [
     warranty_period: "1 Year",
     image_256: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=600&q=80",
     image_1920: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80",
+    vendor_id: [9103, "SurgiPath Instruments"] as [number, string],
+    stock_status: "out_of_stock" as const,
+    low_stock_threshold: 3,
+    qty_available: 0,
+    attribute_line_ids: [] as number[],
   },
   {
     id: 4,
@@ -247,6 +265,11 @@ export const MOCK_PRODUCTS = [
     warranty_period: "2 Years",
     image_256: "https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&w=600&q=80",
     image_1920: "https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&w=1200&q=80",
+    vendor_id: [9104, "HeartSync Medical"] as [number, string],
+    stock_status: "in_stock" as const,
+    low_stock_threshold: 10,
+    qty_available: 28,
+    attribute_line_ids: [] as number[],
   },
   {
     id: 5,
@@ -260,5 +283,119 @@ export const MOCK_PRODUCTS = [
     warranty_period: "1 Year",
     image_256: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=600&q=80",
     image_1920: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80",
+    vendor_id: [9105, "SterilMax Inc."] as [number, string],
+    stock_status: "in_stock" as const,
+    low_stock_threshold: 3,
+    qty_available: 9,
+    attribute_line_ids: [] as number[],
+  },
+  // The two products below have real attribute_lines/variants, unlike the
+  // capital-equipment items above — included specifically so the mock
+  // fallback path can exercise the variant-selection UI too, not just the
+  // live Odoo path.
+  {
+    id: 6,
+    name: "MedGuard Nitrile Examination Gloves",
+    list_price: 18.5,
+    description_sale: "Powder-free nitrile examination gloves with textured fingertips for superior grip. Latex-free, suitable for sensitive-skin use.",
+    categ_id: [14, "PPE & Consumables"],
+    certification_info: "FDA 510(k) Cleared, ASTM D6319",
+    unit_of_measure: "Box",
+    min_order_qty: 10,
+    warranty_period: "N/A",
+    image_256: "https://images.unsplash.com/photo-1584744982491-665216d95f8b?auto=format&fit=crop&w=600&q=80",
+    image_1920: "https://images.unsplash.com/photo-1584744982491-665216d95f8b?auto=format&fit=crop&w=1200&q=80",
+    vendor_id: [9106, "MedGuard Supplies Ltd."] as [number, string],
+    stock_status: "in_stock" as const,
+    low_stock_threshold: 100,
+    qty_available: 2280,
+    attribute_line_ids: [9001, 9004],
+    attribute_lines: [
+      {
+        attribute_id: 9001,
+        attribute_name: "Size",
+        display_type: "radio",
+        values: [
+          { id: 9011, name: "Small", html_color: false as const },
+          { id: 9012, name: "Medium", html_color: false as const },
+          { id: 9013, name: "Large", html_color: false as const },
+          { id: 9014, name: "X-Large", html_color: false as const },
+        ],
+      },
+      {
+        attribute_id: 9004,
+        attribute_name: "Sterility",
+        display_type: "radio",
+        values: [
+          { id: 9041, name: "Sterile", html_color: false as const },
+          { id: 9042, name: "Non-Sterile", html_color: false as const },
+        ],
+      },
+    ],
+    variants: [
+      { id: 96001, price: 18.5, qty_available: 500, active: true, combination: [{ attribute_id: 9001, attribute_name: "Size", value_id: 9011, value_name: "Small" }, { attribute_id: 9004, attribute_name: "Sterility", value_id: 9041, value_name: "Sterile" }] },
+      { id: 96002, price: 21.0, qty_available: 300, active: true, combination: [{ attribute_id: 9001, attribute_name: "Size", value_id: 9011, value_name: "Small" }, { attribute_id: 9004, attribute_name: "Sterility", value_id: 9042, value_name: "Non-Sterile" }] },
+      { id: 96003, price: 18.5, qty_available: 620, active: true, combination: [{ attribute_id: 9001, attribute_name: "Size", value_id: 9012, value_name: "Medium" }, { attribute_id: 9004, attribute_name: "Sterility", value_id: 9041, value_name: "Sterile" }] },
+      { id: 96004, price: 21.0, qty_available: 90, active: true, combination: [{ attribute_id: 9001, attribute_name: "Size", value_id: 9012, value_name: "Medium" }, { attribute_id: 9004, attribute_name: "Sterility", value_id: 9042, value_name: "Non-Sterile" }] },
+      { id: 96005, price: 18.5, qty_available: 400, active: true, combination: [{ attribute_id: 9001, attribute_name: "Size", value_id: 9013, value_name: "Large" }, { attribute_id: 9004, attribute_name: "Sterility", value_id: 9041, value_name: "Sterile" }] },
+      { id: 96006, price: 21.0, qty_available: 0, active: true, combination: [{ attribute_id: 9001, attribute_name: "Size", value_id: 9013, value_name: "Large" }, { attribute_id: 9004, attribute_name: "Sterility", value_id: 9042, value_name: "Non-Sterile" }] },
+      { id: 96007, price: 19.75, qty_available: 220, active: true, combination: [{ attribute_id: 9001, attribute_name: "Size", value_id: 9014, value_name: "X-Large" }, { attribute_id: 9004, attribute_name: "Sterility", value_id: 9041, value_name: "Sterile" }] },
+      { id: 96008, price: 22.25, qty_available: 60, active: true, combination: [{ attribute_id: 9001, attribute_name: "Size", value_id: 9014, value_name: "X-Large" }, { attribute_id: 9004, attribute_name: "Sterility", value_id: 9042, value_name: "Non-Sterile" }] },
+    ],
+  },
+  {
+    id: 7,
+    name: "ProCare Surgical Face Masks",
+    list_price: 15.99,
+    description_sale: "ASTM Level 3 surgical face masks with adjustable nose bridge and triple-layer filtration for high fluid-resistance environments.",
+    categ_id: [14, "PPE & Consumables"],
+    certification_info: "ASTM F2100 Level 3, FDA Cleared",
+    unit_of_measure: "Pack",
+    min_order_qty: 5,
+    warranty_period: "N/A",
+    image_256: "https://images.unsplash.com/photo-1584634731339-252c581abfc5?auto=format&fit=crop&w=600&q=80",
+    image_1920: "https://images.unsplash.com/photo-1584634731339-252c581abfc5?auto=format&fit=crop&w=1200&q=80",
+    vendor_id: [9107, "ProCare Health Products"] as [number, string],
+    stock_status: "in_stock" as const,
+    low_stock_threshold: 50,
+    qty_available: 1840,
+    attribute_line_ids: [9003, 9002],
+    attribute_lines: [
+      {
+        attribute_id: 9003,
+        attribute_name: "Color",
+        display_type: "color",
+        values: [
+          { id: 9031, name: "White", html_color: "#FFFFFF" },
+          { id: 9032, name: "Blue", html_color: "#2E86DE" },
+          { id: 9033, name: "Black", html_color: "#000000" },
+        ],
+      },
+      {
+        attribute_id: 9002,
+        attribute_name: "Pack Size",
+        display_type: "radio",
+        values: [
+          { id: 9021, name: "Single Unit", html_color: false as const },
+          { id: 9022, name: "Pack of 10", html_color: false as const },
+          { id: 9023, name: "Pack of 50", html_color: false as const },
+          { id: 9024, name: "Pack of 100", html_color: false as const },
+        ],
+      },
+    ],
+    variants: [
+      { id: 97001, price: 1.99, qty_available: 400, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9031, value_name: "White" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9021, value_name: "Single Unit" }] },
+      { id: 97002, price: 15.99, qty_available: 300, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9031, value_name: "White" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9022, value_name: "Pack of 10" }] },
+      { id: 97003, price: 69.99, qty_available: 120, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9031, value_name: "White" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9023, value_name: "Pack of 50" }] },
+      { id: 97004, price: 119.99, qty_available: 40, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9031, value_name: "White" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9024, value_name: "Pack of 100" }] },
+      { id: 97005, price: 1.99, qty_available: 380, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9032, value_name: "Blue" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9021, value_name: "Single Unit" }] },
+      { id: 97006, price: 15.99, qty_available: 260, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9032, value_name: "Blue" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9022, value_name: "Pack of 10" }] },
+      { id: 97007, price: 69.99, qty_available: 35, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9032, value_name: "Blue" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9023, value_name: "Pack of 50" }] },
+      { id: 97008, price: 119.99, qty_available: 0, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9032, value_name: "Blue" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9024, value_name: "Pack of 100" }] },
+      { id: 97009, price: 2.49, qty_available: 300, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9033, value_name: "Black" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9021, value_name: "Single Unit" }] },
+      { id: 97010, price: 17.99, qty_available: 190, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9033, value_name: "Black" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9022, value_name: "Pack of 10" }] },
+      { id: 97011, price: 74.99, qty_available: 55, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9033, value_name: "Black" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9023, value_name: "Pack of 50" }] },
+      { id: 97012, price: 129.99, qty_available: 15, active: true, combination: [{ attribute_id: 9003, attribute_name: "Color", value_id: 9033, value_name: "Black" }, { attribute_id: 9002, attribute_name: "Pack Size", value_id: 9024, value_name: "Pack of 100" }] },
+    ],
   },
 ];

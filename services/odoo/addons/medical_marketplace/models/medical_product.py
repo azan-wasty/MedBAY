@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models  # type: ignore
+from odoo.exceptions import ValidationError  # type: ignore
 
 
 class ProductTemplate(models.Model):
@@ -12,12 +13,11 @@ class ProductTemplate(models.Model):
     # ------------------------------------------------------------------
     # B2B company linkage
     # ------------------------------------------------------------------
-    # `seller_ids` (product.supplierinfo) already ships with the base
-    # `product` module and is the correct built-in place to price/link a
-    # product against one or more vendor companies (no `purchase` module
-    # required). `vendor_id` below is just a "primary supplier" shortcut
-    # on top of that for the marketplace UI/API, defaulting to the first
-    # seller line.
+    has_vendor_company = fields.Boolean(
+        string='Has Vendor Company',
+        default=False,
+        help='Check to assign a specific vendor company to this product.'
+    )
     vendor_id = fields.Many2one(
         'res.partner',
         string='Primary Vendor Company',
@@ -33,13 +33,27 @@ class ProductTemplate(models.Model):
             if not product.vendor_id and product.seller_ids:
                 product.vendor_id = product.seller_ids[0].partner_id
 
+    @api.onchange('has_vendor_company')
+    def _onchange_has_vendor_company(self):
+        if not self.has_vendor_company:
+            self.vendor_id = False
+            self.seller_ids = [(5, 0, 0)]
+
     # ------------------------------------------------------------------
-    # Stock status
+    # Marketplace publish/unpublish (Feature 4)
     # ------------------------------------------------------------------
-    # Built entirely on top of `stock`'s own qty_available/type fields —
-    # no separate inventory bookkeeping of our own. `type == 'product'`
-    # is Odoo 17's "Storable Product" value; non-storable (service/consu)
-    # products are always considered untracked rather than "out of stock".
+    marketplace_published = fields.Boolean(
+        string='Published on Marketplace',
+        default=False,
+        index=True,
+        help='Only published products appear on the buyer-facing storefront. '
+             'Unpublishing hides the product from all frontend listings and direct links '
+             'without deleting it or affecting stock.',
+    )
+
+    # ------------------------------------------------------------------
+    # Stock status (existing — do not change field names)
+    # ------------------------------------------------------------------
     low_stock_threshold = fields.Integer(
         string='Low Stock Threshold', default=10,
         help='When on-hand quantity for a storable product falls at or '

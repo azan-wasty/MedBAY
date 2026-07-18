@@ -4,8 +4,97 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { COLOR_PALETTE, DASHBOARD_LABELS, ODOO_STATUS_MAP, AUTH_LABELS, TRACKING_LABELS } from '../../lib/constants';
-import { RFQItem, User, RFQDetail, OrderTracking } from '../../lib/odooClient';
+import {
+  COLOR_PALETTE, DASHBOARD_LABELS, ODOO_STATUS_MAP, AUTH_LABELS,
+  TRACKING_LABELS, REVIEW_LABELS, BUYER_STAGE_MAP, ORDER_STAGE_KEYS
+} from '../../lib/constants';
+import { RFQItem, User, RFQDetail, OrderTracking, OrderReview } from '../../lib/odooClient';
+
+// ---------------------------------------------------------------------------
+// OrderStepper component — horizontal on desktop, vertical on mobile
+// ---------------------------------------------------------------------------
+function OrderStepper({ tracking }: { tracking: OrderTracking }) {
+  const { buyer_stage, stages, carrier, tracking_reference, tracking_url } = tracking;
+  const mainStages = stages.filter(s => ORDER_STAGE_KEYS.includes(s.key));
+  const currentIdx = ORDER_STAGE_KEYS.indexOf(buyer_stage);
+
+  // Branch stages shown as a banner instead of a step
+  const isBranchStage = !ORDER_STAGE_KEYS.includes(buyer_stage);
+  const branchConfig = BUYER_STAGE_MAP[buyer_stage];
+
+  return (
+    <div style={{ marginBottom: '1.5rem' }}>
+      <h5 style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>
+        {TRACKING_LABELS.title}
+      </h5>
+
+      {isBranchStage && branchConfig ? (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.85rem', borderRadius: 'var(--radius-full)', backgroundColor: branchConfig.bg, color: branchConfig.text, fontSize: '0.82rem', fontWeight: 600 }}>
+          {branchConfig.label}
+        </div>
+      ) : (
+        <div className="order-stepper">
+          {mainStages.map((stage, idx) => {
+            const isCompleted = currentIdx > idx || (buyer_stage === 'completed' && stage.key === 'completed');
+            const isActive = buyer_stage === stage.key && !isCompleted;
+            return (
+              <div key={stage.key} className={`stepper-step ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}`}>
+                <div className="stepper-icon">
+                  {isCompleted
+                    ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m20 6-11 11-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    : <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'block' }} />
+                  }
+                </div>
+                <div className="stepper-label">{stage.label}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Carrier tracking info — shown when carrier info exists */}
+      {(buyer_stage === 'out_for_delivery' || buyer_stage === 'delivered' || buyer_stage === 'completed') && carrier && tracking_reference && (
+        <div style={{ marginTop: '0.75rem', padding: '0.75rem 1rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--primary-border)', fontSize: '0.82rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{TRACKING_LABELS.carrierLabel}:</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{carrier.name}</span>
+            <span style={{ color: 'var(--text-muted)' }}>·</span>
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{TRACKING_LABELS.trackingRefLabel}:</span>
+            {tracking_url ? (
+              <a href={tracking_url as string} target="_blank" rel="noopener noreferrer"
+                style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'underline' }}>
+                {tracking_reference} {TRACKING_LABELS.trackingLinkLabel}
+              </a>
+            ) : (
+              <span style={{ fontWeight: 600 }}>{tracking_reference}</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// StarRating selector
+// ---------------------------------------------------------------------------
+function StarRating({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div style={{ display: 'flex', gap: '0.15rem' }}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button key={star} type="button" disabled={disabled}
+          onClick={() => onChange(star)}
+          onMouseEnter={() => !disabled && setHover(star)}
+          onMouseLeave={() => !disabled && setHover(0)}
+          style={{ background: 'none', border: 'none', cursor: disabled ? 'default' : 'pointer', padding: '0.1rem', lineHeight: 1, fontSize: '1.3rem',
+            color: star <= (hover || value) ? '#f59e0b' : '#cbd5e1', transition: 'color 0.1s' }}>
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
 
 
 function DashboardSkeleton() {
@@ -61,11 +150,18 @@ export default function DashboardPage() {
   const [detailError, setDetailError] = useState<string>('');
   const [approving, setApproving] = useState<boolean>(false);
 
-  // Order Tracking (shipments + invoices) States
+  // Order Tracking + Review States
   const [showTracking, setShowTracking] = useState<boolean>(false);
   const [tracking, setTracking] = useState<OrderTracking | null>(null);
   const [trackingLoading, setTrackingLoading] = useState<boolean>(false);
   const [trackingError, setTrackingError] = useState<string>('');
+
+  // Review states
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
 
   const handleOpenRFQ = async (rfq: RFQItem) => {
     setSelectedRfq(rfq);
@@ -75,6 +171,10 @@ export default function DashboardPage() {
     setShowTracking(false);
     setTracking(null);
     setTrackingError('');
+    setReviewRating(5);
+    setReviewText('');
+    setReviewError('');
+    setReviewSuccess('');
     try {
       const res = await fetch(`/api/rfq/${rfq.id}`);
       if (!res.ok) throw new Error('Failed to fetch quote details.');
@@ -117,21 +217,57 @@ export default function DashboardPage() {
       return;
     }
     setShowTracking(true);
-    if (tracking) return; // already loaded for this order
-
+    if (tracking) return;
     try {
       setTrackingLoading(true);
       setTrackingError('');
       const res = await fetch(`/api/orders/${orderId}/tracking`);
       const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to load shipping/invoice status.');
-      }
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to load order status.');
       setTracking(data);
     } catch (err: any) {
-      setTrackingError(err.message || 'Unable to retrieve tracking information.');
+      setTrackingError(err.message || 'Unable to retrieve order status.');
     } finally {
       setTrackingLoading(false);
+    }
+  };
+
+  const handleSubmitReview = async (orderId: number) => {
+    setReviewError('');
+    setReviewSuccess('');
+    try {
+      setSubmittingReview(true);
+      const res = await fetch(`/api/orders/${orderId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: reviewRating, review_text: reviewText }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to submit review.');
+      setReviewSuccess(REVIEW_LABELS.successMsg);
+      // Refresh tracking to get has_been_reviewed=true + review object
+      const tRes = await fetch(`/api/orders/${orderId}/tracking`);
+      const tData = await tRes.json();
+      if (tRes.ok) setTracking(tData);
+    } catch (err: any) {
+      setReviewError(err.message || 'An error occurred during submission.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: number, orderId: number) => {
+    if (!confirm('Are you sure you want to delete this review? This action cannot be undone, and you cannot submit another review for this order.')) return;
+    try {
+      const res = await fetch(`/api/reviews/${reviewId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete review');
+      // Refresh tracking
+      const tRes = await fetch(`/api/orders/${orderId}/tracking`);
+      const tData = await tRes.json();
+      if (tRes.ok) setTracking(tData);
+    } catch (err: any) {
+      console.error(err);
+      alert('Unable to delete review.');
     }
   };
 
@@ -484,13 +620,17 @@ export default function DashboardPage() {
                                 {trackingLoading ? (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                                     <span className="spinner" style={{ width: '16px', height: '16px' }} />
-                                    Loading shipping and invoice status...
+                                    Loading order status...
                                   </div>
                                 ) : trackingError ? (
                                   <div className="alert alert-error" style={{ margin: 0 }}>{trackingError}</div>
                                 ) : tracking ? (
                                   <>
-                                    <h5 style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                    {/* Order Status Stepper */}
+                                    <OrderStepper tracking={tracking} />
+
+                                    {/* Shipments */}
+                                    <h5 style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>
                                       {TRACKING_LABELS.pickingsTitle}
                                     </h5>
                                     {tracking.pickings.length === 0 ? (
@@ -498,14 +638,7 @@ export default function DashboardPage() {
                                     ) : (
                                       <div className="table-container" style={{ marginBottom: '1rem' }}>
                                         <table className="responsive-table" style={{ fontSize: '0.8rem' }}>
-                                          <thead>
-                                            <tr>
-                                              <th>Reference</th>
-                                              <th>Status</th>
-                                              <th>{TRACKING_LABELS.scheduledLabel}</th>
-                                              <th>{TRACKING_LABELS.doneLabel}</th>
-                                            </tr>
-                                          </thead>
+                                          <thead><tr><th>Reference</th><th>Status</th><th>{TRACKING_LABELS.scheduledLabel}</th><th>{TRACKING_LABELS.doneLabel}</th></tr></thead>
                                           <tbody>
                                             {tracking.pickings.map((p) => (
                                               <tr key={p.id}>
@@ -520,22 +653,16 @@ export default function DashboardPage() {
                                       </div>
                                     )}
 
-                                    <h5 style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                    {/* Invoices */}
+                                    <h5 style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>
                                       {TRACKING_LABELS.invoicesTitle}
                                     </h5>
                                     {tracking.invoices.length === 0 ? (
-                                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>{TRACKING_LABELS.noInvoices}</p>
+                                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 1rem 0' }}>{TRACKING_LABELS.noInvoices}</p>
                                     ) : (
-                                      <div className="table-container">
+                                      <div className="table-container" style={{ marginBottom: '1.25rem' }}>
                                         <table className="responsive-table" style={{ fontSize: '0.8rem' }}>
-                                          <thead>
-                                            <tr>
-                                              <th>Reference</th>
-                                              <th>Status</th>
-                                              <th>Payment</th>
-                                              <th style={{ textAlign: 'right' }}>Amount</th>
-                                            </tr>
-                                          </thead>
+                                          <thead><tr><th>Reference</th><th>Status</th><th>Payment</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
                                           <tbody>
                                             {tracking.invoices.map((inv) => (
                                               <tr key={inv.id}>
@@ -547,6 +674,57 @@ export default function DashboardPage() {
                                             ))}
                                           </tbody>
                                         </table>
+                                      </div>
+                                    )}
+
+                                    {/* Review section — only for completed orders, one-time-ever */}
+                                    {tracking.buyer_stage === 'completed' && (
+                                      <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                                        <h5 style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                                          {REVIEW_LABELS.sectionTitle}
+                                        </h5>
+                                        {tracking.has_been_reviewed ? (
+                                          tracking.review ? (
+                                            <div style={{ fontSize: '0.82rem' }}>
+                                              <div style={{ color: '#f59e0b', fontSize: '1.1rem', marginBottom: '0.25rem' }}>
+                                                {'★'.repeat(tracking.review.rating)}{'☆'.repeat(5 - tracking.review.rating)}
+                                              </div>
+                                              {tracking.review.review_text && <p style={{ color: 'var(--text-secondary)', margin: '0 0 0.25rem 0' }}>{tracking.review.review_text}</p>}
+                                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                                                  {new Date(tracking.review.create_date).toLocaleDateString()}
+                                                </span>
+                                                <button type="button" onClick={() => handleDeleteReview(tracking.review!.id, tracking.order_id)} style={{ color: '#ef4444', background: 'none', border: 'none', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}>Delete Review</button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{REVIEW_LABELS.alreadyReviewed}</p>
+                                          )
+                                        ) : (
+                                          <div>
+                                            <AnimatePresence>
+                                              {reviewError && <motion.div className="alert alert-error" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{reviewError}</motion.div>}
+                                              {reviewSuccess && <motion.div className="alert alert-success" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{reviewSuccess}</motion.div>}
+                                            </AnimatePresence>
+                                            {!reviewSuccess && (
+                                              <>
+                                                <div style={{ marginBottom: '0.5rem' }}>
+                                                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '0.25rem' }}>{REVIEW_LABELS.ratingLabel}</label>
+                                                  <StarRating value={reviewRating} onChange={setReviewRating} disabled={submittingReview} />
+                                                </div>
+                                                <div style={{ marginBottom: '0.75rem' }}>
+                                                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '0.25rem' }}>{REVIEW_LABELS.reviewTextLabel}</label>
+                                                  <textarea className="form-input" rows={2} value={reviewText} onChange={e => setReviewText(e.target.value)} placeholder={REVIEW_LABELS.reviewTextPlaceholder} disabled={submittingReview} style={{ fontSize: '0.82rem' }} />
+                                                </div>
+                                                <button type="button" className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                                                  onClick={() => handleSubmitReview(rfqDetail.id)} disabled={submittingReview}>
+                                                  {submittingReview && <span className="spinner" />}
+                                                  {submittingReview ? REVIEW_LABELS.submitting : REVIEW_LABELS.submitButton}
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </>

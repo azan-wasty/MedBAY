@@ -10,17 +10,24 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { order_id, product_id, quantity, return_type, reason } = await request.json();
+        const { order_id, product_id, quantity, return_type, reason_category_id, reason_detail } = await request.json();
 
-        if (!order_id || !product_id || !quantity || !return_type || !reason) {
+        if (!order_id || !product_id || !quantity || !return_type || !reason_category_id) {
             return NextResponse.json(
-                { error: 'order_id, product_id, quantity, return_type, and reason are all required' },
+                { error: 'order_id, product_id, quantity, return_type, and reason_category_id are all required' },
                 { status: 400 }
             );
         }
 
         const result = await odooClient.createReturnRequest(
-            { order_id, product_id, quantity, return_type, reason },
+            {
+                order_id: typeof order_id === 'number' ? order_id : parseInt(order_id, 10),
+                product_id: typeof product_id === 'number' ? product_id : parseInt(product_id, 10),
+                quantity: typeof quantity === 'number' ? quantity : parseFloat(quantity),
+                return_type,
+                reason_category_id: typeof reason_category_id === 'number' ? reason_category_id : parseInt(reason_category_id, 10),
+                reason_detail: reason_detail ?? ''
+            },
             session.value
         );
         return NextResponse.json(result);

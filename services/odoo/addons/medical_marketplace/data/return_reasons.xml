@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Return reason categories.
+        noupdate="1" means these records survive module upgrades.
+        To add/rename reasons: edit this file and run 'Upgrade' on the module.
+        Admins can also add custom reasons directly in the Odoo backend under
+        Medical Marketplace > Configuration > Return Reasons.
+    -->
+    <data noupdate="1">
+        <record id="reason_defective" model="medical.return.reason">
+            <field name="name">Defective Product</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="reason_wrong_item" model="medical.return.reason">
+            <field name="name">Wrong Item Shipped</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="reason_damaged_transit" model="medical.return.reason">
+            <field name="name">Damaged in Transit</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="reason_no_longer_needed" model="medical.return.reason">
+            <field name="name">No Longer Needed</field>
+            <field name="sequence">40</field>
+        </record>
+        <record id="reason_warranty_claim" model="medical.return.reason">
+            <field name="name">Warranty Claim</field>
+            <field name="sequence">50</field>
+        </record>
+        <record id="reason_incorrect_quantity" model="medical.return.reason">
+            <field name="name">Incorrect Quantity Received</field>
+            <field name="sequence">60</field>
+        </record>
+        <record id="reason_other" model="medical.return.reason">
+            <field name="name">Other</field>
+            <field name="sequence">70</field>
+        </record>
+    </data>
+</odoo>
