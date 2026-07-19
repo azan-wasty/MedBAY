@@ -1,10 +1,46 @@
-import "./globals.css";
-import Navbar from "../components/Navbar";
-import { BRAND_CONFIG } from "../lib/constants";
+import type { Metadata, Viewport } from "next";
 
-export const metadata = {
-  title: BRAND_CONFIG.name,
-  description: BRAND_CONFIG.slogan,
+import "./globals.css";
+import { BRAND_CONFIG } from "@/lib/constants";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
+
+export const metadata: Metadata = {
+  title: {
+    default: `${BRAND_CONFIG.name} — ${BRAND_CONFIG.slogan}`,
+    template: `%s | ${BRAND_CONFIG.name}`,
+  },
+  description:
+    "MedBAY connects hospitals, clinics, and distributors with verified medical equipment suppliers — transparent bulk pricing, compliant sourcing, and RFQ-based procurement in one enterprise marketplace.",
+  keywords: [
+    "medical equipment marketplace",
+    "B2B medical procurement",
+    "hospital equipment supplier",
+    "bulk medical equipment",
+    "RFQ medical devices",
+  ],
+  authors: [{ name: BRAND_CONFIG.name }],
+  metadataBase: new URL("https://www.medbay.com"),
+  openGraph: {
+    type: "website",
+    title: `${BRAND_CONFIG.name} — ${BRAND_CONFIG.slogan}`,
+    description: "Verified medical equipment suppliers. Transparent bulk pricing. Enterprise procurement, simplified.",
+    siteName: BRAND_CONFIG.name,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${BRAND_CONFIG.name} — ${BRAND_CONFIG.slogan}`,
+    description: "Verified medical equipment suppliers. Transparent bulk pricing. Enterprise procurement, simplified.",
+  },
+  icons: {
+    icon: "/favicon.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0A1628",
 };
 
 export default function RootLayout({
@@ -14,42 +50,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body>
-        <div className="main-wrapper">
-          <Navbar />
-          <main style={{ flex: 1 }}>{children}</main>
-          <footer className="footer">
-            <div className="container footer-layout">
-              <div>
-                <h4 className="footer-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  {BRAND_CONFIG.name}
-                </h4>
-                <p style={{ maxWidth: "350px", lineHeight: "1.5" }}>{BRAND_CONFIG.slogan}</p>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <h5 style={{ color: "#fff", marginBottom: "0.25rem", fontWeight: 500, fontSize: "0.875rem" }}>Contact Procurement</h5>
-                <p>Email: {BRAND_CONFIG.contactEmail}</p>
-                <p>Phone: {BRAND_CONFIG.phone}</p>
-                <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.25rem" }}>{BRAND_CONFIG.address}</p>
-              </div>
-              <div className="footer-copy">
-                <p>&copy; {new Date().getFullYear()} {BRAND_CONFIG.name}. All Rights Reserved.</p>
-              </div>
-            </div>
-          </footer>
-        </div>
+      <body className="flex min-h-screen flex-col bg-background font-sans text-foreground">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-ink-900 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+        >
+          Skip to content
+        </a>
+        <Navbar />
+        <main id="main-content" className="flex-1">
+          {children}
+        </main>
+        <Footer />
       </body>
     </html>
   );

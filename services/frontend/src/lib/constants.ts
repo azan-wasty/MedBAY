@@ -31,7 +31,7 @@ export const NAV_LINKS = [
   { label: "RFQ Cart", path: "/cart" },
   { label: "Dashboard", path: "/dashboard" },
   { label: "Returns", path: "/returns" },
-  { label: "Admin", path: "/admin/companies" },
+  { label: "Admin", path: "/admin" },
 ];
 
 export const AUTH_LABELS = {
@@ -63,6 +63,8 @@ export const CATALOG_LABELS = {
   addToCart: "Add to RFQ",
   addedToCart: "added to your RFQ cart",
   viewDetails: "View Details",
+  outOfStockLabel: "Out of Stock",
+  outOfStockTooltip: "This item is currently out of stock and cannot be added to an RFQ.",
 };
 
 export const PRODUCT_DETAILS_LABELS = {
@@ -146,7 +148,11 @@ export const RETURNS_LABELS = {
   refundOption: "Refund",
   replacementOption: "Replacement",
   reasonLabel: "Reason for Return",
-  reasonPlaceholder: "Describe the issue (defect, damage, wrong item, etc.)",
+  reasonPlaceholder: "Select a reason...",
+  loadingReasons: "Loading return reasons...",
+  reasonsError: "Unable to load return reasons. Please try again.",
+  reasonDetailLabel: "Additional Details (Optional)",
+  reasonDetailPlaceholder: "Describe the issue (defect, damage, wrong item, etc.)",
   submitButton: "Submit Return Request",
   submitting: "Submitting...",
   noEligibleOrders: "You don't have any confirmed orders eligible for a return yet.",
@@ -155,9 +161,51 @@ export const RETURNS_LABELS = {
   tableName: "Reference",
   tableProduct: "Product",
   tableQty: "Qty",
+  tableReason: "Reason",
   tableType: "Resolution",
   tableStatus: "Status",
   tableDate: "Requested",
+};
+
+export const ADMIN_RETURNS_LABELS = {
+  filterAll: "All",
+  filterUnderReview: "Under Review",
+  filterApproved: "Approved",
+  filterRejected: "Rejected",
+  noReturns: "No return requests match this filter.",
+  tableRef: "Reference",
+  tableOrder: "Order",
+  tableCompany: "Company",
+  tableProduct: "Product",
+  tableReason: "Reason",
+  tableType: "Resolution",
+  tableStatus: "Status",
+  tableDate: "Requested",
+  approveButton: "Approve",
+  rejectButton: "Reject",
+};
+
+export const REVIEW_LABELS = {
+  sectionTitle: "Rate This Order",
+  alreadyReviewed: "You've already submitted a review for this order.",
+  ratingLabel: "Your Rating",
+  reviewTextLabel: "Your Review (Optional)",
+  reviewTextPlaceholder: "Share your experience with this equipment and supplier...",
+  submitButton: "Submit Review",
+  submitting: "Submitting...",
+  successMsg: "Thank you — your review has been submitted.",
+};
+
+// Buyer-facing order journey. Mirrors medical_marketplace.order_stages in the
+// Odoo addon (services/odoo/addons/medical_marketplace/data/config_params.xml)
+// exactly — these are the "key" values the backend's _compute_buyer_stage()
+// can return. The five below are the linear happy-path steps rendered as a
+// stepper; return_requested/cancelled are branch states shown as a banner.
+export const ORDER_STAGE_KEYS = ["ordered", "processing", "out_for_delivery", "delivered", "completed"];
+
+export const BUYER_STAGE_MAP: Record<string, { label: string; bg: string; text: string }> = {
+  return_requested: { label: "Return Requested", bg: "#fef3c7", text: "#92400e" },
+  cancelled: { label: "Cancelled", bg: "#fee2e2", text: "#991b1b" },
 };
 
 export const TRACKING_LABELS = {
@@ -170,6 +218,9 @@ export const TRACKING_LABELS = {
   noInvoices: "No invoices have been generated for this order yet.",
   scheduledLabel: "Scheduled",
   doneLabel: "Completed",
+  carrierLabel: "Carrier",
+  trackingRefLabel: "Tracking Ref.",
+  trackingLinkLabel: "(Track Shipment)",
 };
 
 export const ADMIN_COMPANIES_LABELS = {
@@ -193,6 +244,116 @@ export const ADMIN_COMPANIES_LABELS = {
   forbiddenTitle: "Admin Access Required",
   forbiddenMsg: "You must be a marketplace admin to view this page.",
 };
+
+// ---------------------------------------------------------------------------
+// Marketing / homepage content — new for the v2 redesign. Kept alongside the
+// rest of the site copy so every string on the site still lives in one file.
+// ---------------------------------------------------------------------------
+
+export const HERO_CONTENT = {
+  eyebrow: "Verified B2B Medical Equipment Marketplace",
+  headline: "Procure medical equipment with total confidence.",
+  subheadline:
+    "MedBAY connects hospitals, clinics, and distributors with verified suppliers — transparent bulk pricing, compliant sourcing, and RFQ-based procurement in one enterprise marketplace.",
+  primaryCta: "Browse Catalog",
+  secondaryCta: "How Sourcing Works",
+  trustChips: ["FDA & CE compliant catalog", "RFQ-based bulk pricing", "Verified supplier network"],
+};
+
+export const TRUST_STATS = [
+  { value: "1,200+", label: "Verified Suppliers" },
+  { value: "45K+", label: "SKUs Listed" },
+  { value: "120+", label: "Countries Served" },
+  { value: "98%", label: "On-Time Fulfillment" },
+];
+
+// Icon is a lucide-react component name, resolved via the ICON_MAP lookup in
+// components/home/CategoriesGrid.tsx. Categories mirror the taxonomy already
+// present in MOCK_PRODUCTS below.
+export const CATEGORY_SHOWCASE = [
+  { name: "Diagnostic Imaging", icon: "ScanLine", description: "MRI, CT, ultrasound & X-ray systems from certified manufacturers." },
+  { name: "Life Support", icon: "HeartPulse", description: "Ventilators, defibrillators & critical care monitoring equipment." },
+  { name: "Operating Room", icon: "Syringe", description: "Surgical lighting, instruments & OR-grade equipment." },
+  { name: "Sterilization", icon: "FlaskConical", description: "Autoclaves and sterile processing systems for compliant facilities." },
+  { name: "PPE & Consumables", icon: "Boxes", description: "Bulk gloves, masks, and single-use clinical consumables." },
+];
+
+export const BENEFITS_CONTENT = [
+  {
+    icon: "BadgeCheck",
+    title: "Verified Supplier Network",
+    description:
+      "Every organization completes a registration and compliance review before they can transact — so you always know who you're buying from.",
+  },
+  {
+    icon: "ClipboardList",
+    title: "Transparent RFQ Workflow",
+    description:
+      "Request formal quotes on bulk orders, negotiate on your terms, and track every RFQ from draft to fulfillment.",
+  },
+  {
+    icon: "Truck",
+    title: "End-to-End Order Tracking",
+    description:
+      "Follow every shipment from confirmation to delivery, with carrier tracking and invoice status in one dashboard.",
+  },
+  {
+    icon: "RotateCcw",
+    title: "Hassle-Free Returns",
+    description: "Request a refund or replacement directly from your order history — no phone calls, no runaround.",
+  },
+];
+
+export const TESTIMONIALS = [
+  {
+    quote:
+      "MedBAY cut our capital equipment sourcing cycle from weeks to days. The RFQ workflow alone justified the switch.",
+    name: "Sarah Whitfield",
+    role: "Director of Procurement",
+    org: "Regional Hospital Network",
+  },
+  {
+    quote:
+      "Every supplier we've transacted with has been pre-verified. For a distributor handling seven-figure equipment orders, that trust is everything.",
+    name: "Marcus Chen",
+    role: "VP of Supply Chain",
+    org: "National Diagnostics Group",
+  },
+  {
+    quote:
+      "Order tracking and returns used to mean phone tag with three different vendors. Now it's a single dashboard.",
+    name: "Priya Nair",
+    role: "Procurement Lead",
+    org: "MedSupply Distributors",
+  },
+];
+
+export const FAQ_ITEMS = [
+  {
+    q: "How do I request a quote for bulk equipment?",
+    a: "Add any item to your RFQ cart from the catalog, adjust quantities, and submit — our team reviews it and returns a formal quotation, viewable from your dashboard.",
+  },
+  {
+    q: "How are suppliers verified on MedBAY?",
+    a: "Every supplier organization submits registration and licensing details, which our marketplace admin team reviews before the account is approved to list or fulfill orders.",
+  },
+  {
+    q: "What happens after my order ships?",
+    a: "Track shipping and invoice status in real time from your dashboard, including carrier and tracking reference numbers once a shipment is dispatched.",
+  },
+  {
+    q: "Can I return or replace equipment after delivery?",
+    a: "Yes — submit a return request directly from an eligible completed order, choose refund or replacement, and our team will review it.",
+  },
+  {
+    q: "Is there a minimum order requirement?",
+    a: "Minimum order quantities vary by product and are listed on every product page and catalog card, reflecting each supplier's fulfillment requirements.",
+  },
+  {
+    q: "Do you support international procurement?",
+    a: "MedBAY works with suppliers and buyers across multiple regions; compliance certifications (FDA, CE, ISO) are listed on each product to support cross-border sourcing decisions.",
+  },
+];
 
 // High-quality mock catalog data used as a fallback if Odoo has no records.
 // Shaped to match the current Product/AttributeLine/ProductVariant types in
@@ -399,3 +560,14 @@ export const MOCK_PRODUCTS = [
     ],
   },
 ];
+// Supplier showcase for the homepage "Trusted Suppliers" section — derived
+// directly from the vendors already present in MOCK_PRODUCTS rather than
+// invented separately, so it never drifts from the real catalog data.
+export const SUPPLIER_SHOWCASE = Array.from(
+  new Map(
+    MOCK_PRODUCTS.map((p) => [
+      p.vendor_id[1],
+      { name: p.vendor_id[1], category: p.categ_id[1], certification: p.certification_info },
+    ])
+  ).values()
+);

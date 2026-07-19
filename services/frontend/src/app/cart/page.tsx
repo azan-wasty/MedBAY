@@ -2,10 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
-import { COLOR_PALETTE, CART_LABELS, AUTH_LABELS, BRAND_CONFIG } from '../../lib/constants';
+import { Minus, Plus, Trash2, ArrowRight, Loader2, PackageCheck, ShoppingCart } from 'lucide-react';
+
+import { CART_LABELS, AUTH_LABELS } from '@/lib/constants';
+import { Container } from '@/components/shared/Container';
+import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 
 interface CartItem {
   id: number;
@@ -22,13 +26,7 @@ const alertVariants: Variants = {
   exit: { opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.15 } },
 };
 
-const successVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.3, type: 'spring' as const, stiffness: 300, damping: 20 } },
-};
-
 export default function CartPage() {
-  const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -37,11 +35,9 @@ export default function CartPage() {
   const [errorMsg, setErrorMsg] = useState<string>('');
 
   useEffect(() => {
-    // Load auth status
     const storedUser = localStorage.getItem('med_user');
     setIsLoggedIn(!!storedUser);
 
-    // Load cart items
     const loadCart = () => {
       const storedCart = localStorage.getItem('med_cart');
       if (storedCart) {
@@ -117,7 +113,6 @@ export default function CartPage() {
         throw new Error(data.error || 'Failed to submit Request for Quote');
       }
 
-      // Success
       setSubmittedRfq({ id: data.rfq_id, name: data.name });
       setSuccess(true);
       handleClearCart();
@@ -130,206 +125,191 @@ export default function CartPage() {
 
   if (success) {
     return (
-      <div className="container" style={{ maxWidth: '500px', padding: '4rem 1rem' }}>
-        <motion.div
-          className="section-card"
-          variants={successVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem', color: COLOR_PALETTE.textDark }}>
-            {CART_LABELS.successTitle}
-          </h2>
-          <p style={{ color: COLOR_PALETTE.textSecondary, fontSize: '0.875rem', lineHeight: '1.5', marginBottom: '1.5rem' }}>
-            {CART_LABELS.successSubtitle}
-          </p>
+      <div className="flex min-h-[calc(100vh-4.5rem)] items-center bg-ink-50/40 py-16">
+        <Container className="flex justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, type: 'spring', stiffness: 300, damping: 20 }}
+            className="w-full max-w-md rounded-2xl border border-ink-100 bg-white p-8 text-center shadow-soft-lg"
+          >
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+              <PackageCheck className="h-7 w-7" />
+            </span>
+            <h2 className="mt-5 font-display text-xl font-semibold text-ink-900">{CART_LABELS.successTitle}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-500">{CART_LABELS.successSubtitle}</p>
 
-          {submittedRfq && (
-            <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-body)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.875rem', color: COLOR_PALETTE.textSecondary, fontWeight: 500 }}>Reference ID</span>
-              <strong style={{ color: COLOR_PALETTE.textDark, fontSize: '1rem' }}>{submittedRfq.name}</strong>
+            {submittedRfq && (
+              <div className="mt-6 flex items-center justify-between rounded-lg border border-ink-100 bg-ink-50/70 px-4 py-3">
+                <span className="text-[13px] font-medium text-ink-500">Reference ID</span>
+                <strong className="font-data text-[15px] text-ink-900">{submittedRfq.name}</strong>
+              </div>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <Button asChild variant="brand" className="flex-1">
+                <Link href="/dashboard">View Status</Link>
+              </Button>
+              <Button asChild variant="outline" className="flex-1">
+                <Link href="/">Back to Catalog</Link>
+              </Button>
             </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <Link href="/dashboard" className="btn btn-primary" style={{ flex: 1 }}>
-              View Status
-            </Link>
-            <Link href="/" className="btn btn-outline" style={{ flex: 1 }}>
-              Back to Catalog
-            </Link>
-          </div>
-        </motion.div>
+          </motion.div>
+        </Container>
       </div>
     );
   }
 
+  const totalItems = cartItems.reduce((acc, curr) => acc + curr.quantity, 0);
+  const orgName = isLoggedIn ? JSON.parse(localStorage.getItem('med_user') || '{}').name : 'Not Signed In';
+
   return (
-    <div className="container" style={{ padding: '2rem 2rem' }}>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 600, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>
-        {CART_LABELS.title}
-      </h1>
-      <p style={{ color: COLOR_PALETTE.textSecondary, fontSize: '0.875rem', marginBottom: '2rem' }}>
-        {CART_LABELS.subtitle}
-      </p>
+    <div className="bg-ink-50/40 py-10 sm:py-14">
+      <Container>
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl">
+          {CART_LABELS.title}
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">{CART_LABELS.subtitle}</p>
 
-      <AnimatePresence>
-        {errorMsg && (
+        <AnimatePresence>
+          {errorMsg && (
+            <motion.div variants={alertVariants} initial="hidden" animate="visible" exit="exit" className="mt-5">
+              <Alert variant="error">
+                {errorMsg}
+                {!isLoggedIn && (
+                  <div className="mt-1">
+                    <Link href="/login" className="font-semibold underline underline-offset-2">
+                      Sign in now
+                    </Link>
+                  </div>
+                )}
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {cartItems.length === 0 ? (
           <motion.div
-            className="alert alert-error"
-            variants={alertVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="mt-8 flex flex-col items-center gap-4 rounded-2xl border border-dashed border-ink-200 bg-white px-6 py-16 text-center"
           >
-            <div>
-              {errorMsg}
-              {!isLoggedIn && (
-                <div style={{ marginTop: '0.25rem' }}>
-                  <Link href="/login" style={{ textDecoration: 'underline', fontWeight: 500, color: 'inherit' }}>
-                    Sign in now
-                  </Link>
-                </div>
-              )}
-            </div>
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-ink-50 text-ink-300">
+              <ShoppingCart className="h-6 w-6" />
+            </span>
+            <p className="max-w-sm text-sm text-ink-500">{CART_LABELS.emptyCart}</p>
+            <Button asChild variant="brand">
+              <Link href="/">Browse Catalog</Link>
+            </Button>
           </motion.div>
-        )}
-      </AnimatePresence>
+        ) : (
+          <div className="mt-8 grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_320px]">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
+              <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
+                <span className="text-sm font-medium text-ink-600">
+                  {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
+                </span>
+                <button
+                  onClick={handleClearCart}
+                  className="text-xs font-semibold text-ink-500 transition-colors hover:text-red-600"
+                >
+                  {CART_LABELS.clearCart}
+                </button>
+              </div>
 
-      {cartItems.length === 0 ? (
-        <motion.div
-          style={{ padding: '4rem 2rem', backgroundColor: 'var(--bg-white)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <p style={{ color: COLOR_PALETTE.textSecondary, fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-            {CART_LABELS.emptyCart}
-          </p>
-          <Link href="/" className="btn btn-outline">
-            Browse Catalog
-          </Link>
-        </motion.div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
-          {/* Cart Table */}
-          <div>
-            <div className="cart-header-actions">
-              <span style={{ fontSize: '0.875rem', fontWeight: 500, color: COLOR_PALETTE.textSecondary }}>
-                {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
-              </span>
-              <button onClick={handleClearCart} className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
-                {CART_LABELS.clearCart}
-              </button>
-            </div>
+              <ul>
+                <AnimatePresence initial={false}>
+                  {cartItems.map((item) => (
+                    <motion.li
+                      key={item.id}
+                      initial={{ opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 12, height: 0, transition: { duration: 0.2 } }}
+                      transition={{ duration: 0.25 }}
+                      layout
+                      className="flex flex-col gap-3 border-b border-ink-100 px-5 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/products/${item.id}`}
+                          className="line-clamp-1 text-[14px] font-medium text-ink-900 hover:text-brand-700"
+                        >
+                          {item.name}
+                        </Link>
+                        {item.variantLabel && <p className="mt-0.5 text-xs text-ink-500">{item.variantLabel}</p>}
+                      </div>
 
-            <div className="table-container">
-              <table className="responsive-table">
-                <thead>
-                  <tr>
-                    <th>{CART_LABELS.itemTableHeadProduct}</th>
-                    <th>{CART_LABELS.itemTableHeadQty}</th>
-                    <th>{CART_LABELS.itemTableHeadActions}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <AnimatePresence initial={false}>
-                    {cartItems.map((item) => (
-                      <motion.tr
-                        key={item.id}
-                        initial={{ opacity: 0, x: -12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 12, transition: { duration: 0.2 } }}
-                        transition={{ duration: 0.25 }}
-                        layout
-                      >
-                        <td style={{ fontWeight: 500 }}>
-                          <Link href={`/products/${item.id}`} style={{ color: COLOR_PALETTE.textDark }}>
-                            {item.name}
-                          </Link>
-                          {item.variantLabel && (
-                            <div style={{ fontSize: '0.75rem', fontWeight: 400, color: COLOR_PALETTE.textSecondary, marginTop: '0.15rem' }}>
-                              {item.variantLabel}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <motion.button
-                              onClick={() => handleUpdateQty(item.id, item.quantity - 1)}
-                              className="btn btn-outline"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                              whileTap={{ scale: 0.88 }}
-                            >
-                              -
-                            </motion.button>
-                            <span style={{ fontWeight: 500, width: '32px', textAlign: 'center', fontSize: '0.875rem' }}>
-                              {item.quantity}
-                            </span>
-                            <motion.button
-                              onClick={() => handleUpdateQty(item.id, item.quantity + 1)}
-                              className="btn btn-outline"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                              whileTap={{ scale: 0.88 }}
-                            >
-                              +
-                            </motion.button>
-                          </div>
-                        </td>
-                        <td>
-                          <motion.button
-                            onClick={() => handleRemoveItem(item.id)}
-                            className="btn btn-danger-outline"
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                            whileTap={{ scale: 0.92 }}
+                      <div className="flex items-center justify-between gap-4 sm:justify-end">
+                        <div className="flex items-center gap-1 rounded-md border border-ink-200 p-0.5">
+                          <button
+                            onClick={() => handleUpdateQty(item.id, item.quantity - 1)}
+                            aria-label="Decrease quantity"
+                            className="flex h-7 w-7 items-center justify-center rounded text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
                           >
-                            Remove
-                          </motion.button>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-            </div>
-          </div>
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="w-8 text-center text-sm font-medium text-ink-900">{item.quantity}</span>
+                          <button
+                            onClick={() => handleUpdateQty(item.id, item.quantity + 1)}
+                            aria-label="Increase quantity"
+                            className="flex h-7 w-7 items-center justify-center rounded text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
 
-          {/* Submission Summary Panel */}
-          <div className="section-card">
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '1rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
-              Quote Summary
-            </h3>
-
-            <p style={{ color: COLOR_PALETTE.textSecondary, fontSize: '0.75rem', lineHeight: '1.5', marginBottom: '1.25rem' }}>
-              Final pricing is determined on a quote-by-quote basis depending on quantities and your organization's profile.
-            </p>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.825rem' }}>
-                <span style={{ color: COLOR_PALETTE.textSecondary }}>Organization</span>
-                <strong style={{ color: COLOR_PALETTE.textDark }}>
-                  {isLoggedIn ? JSON.parse(localStorage.getItem('med_user') || '{}').name : 'Not Signed In'}
-                </strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem' }}>
-                <span style={{ color: COLOR_PALETTE.textSecondary }}>Total Items</span>
-                <strong>{cartItems.reduce((acc, curr) => acc + curr.quantity, 0)}</strong>
-              </div>
+                        <button
+                          onClick={() => handleRemoveItem(item.id)}
+                          aria-label={`Remove ${item.name}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
             </div>
 
-            <motion.button
-              onClick={handleSubmitRFQ}
-              disabled={submitting}
-              className="btn btn-primary"
-              style={{ width: '100%', gap: '0.5rem' }}
-              whileTap={!submitting ? { scale: 0.97 } : {}}
-            >
-              {submitting && <span className="spinner" />}
-              {submitting ? CART_LABELS.submitting : CART_LABELS.submitButton}
-            </motion.button>
+            <div className="rounded-xl border border-ink-100 bg-white p-6 shadow-soft-xs lg:sticky lg:top-24">
+              <h3 className="border-b border-ink-100 pb-3 font-display text-[15px] font-semibold text-ink-900">
+                Quote Summary
+              </h3>
+              <p className="mt-3 text-[12.5px] leading-relaxed text-ink-500">
+                Final pricing is determined on a quote-by-quote basis depending on quantities and your
+                organization&apos;s profile.
+              </p>
+
+              <div className="mt-5 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-ink-500">Organization</span>
+                  <strong className="max-w-[60%] truncate text-right font-medium text-ink-900">{orgName}</strong>
+                </div>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-ink-500">Total Items</span>
+                  <strong className="font-medium text-ink-900">{totalItems}</strong>
+                </div>
+              </div>
+
+              <Button onClick={handleSubmitRFQ} disabled={submitting} variant="brand" size="lg" className="mt-6 w-full">
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {CART_LABELS.submitting}
+                  </>
+                ) : (
+                  <>
+                    {CART_LABELS.submitButton}
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Container>
     </div>
   );
 }

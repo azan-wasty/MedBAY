@@ -3,7 +3,21 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { COLOR_PALETTE, AUTH_LABELS } from '../../lib/constants';
+import { ShieldCheck, ArrowRight, Loader2, CheckCircle2, PartyPopper } from 'lucide-react';
+
+import { AUTH_LABELS, BRAND_CONFIG } from '@/lib/constants';
+import { Logo } from '@/components/shared/Logo';
+import { PulseLine } from '@/components/shared/PulseLine';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert } from '@/components/ui/alert';
+
+const TRUST_POINTS = [
+  'Verified supplier & buyer network',
+  'RFQ-based transparent pricing',
+  'End-to-end order & return tracking',
+];
 
 export default function RegisterPage() {
   const [name, setName] = useState<string>('');
@@ -51,131 +65,170 @@ export default function RegisterPage() {
     }
   };
 
-  if (success) {
-    return (
-      <div className="container" style={{ maxWidth: '440px', padding: '4rem 1rem' }}>
-        <motion.div
-          className="auth-card"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
-        >
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: COLOR_PALETTE.textDark, marginBottom: '0.5rem' }}>
-            Registration Complete
-          </h2>
-          <p style={{ color: COLOR_PALETTE.textSecondary, fontSize: '0.875rem', lineHeight: '1.5', marginBottom: '2rem' }}>
-            Your organization profile has been submitted. Once verified, you'll be able to request quotations through MedBAY.
-          </p>
-          <Link href="/login" className="btn btn-primary" style={{ width: '100%', padding: '0.6rem' }}>
-            Proceed to Sign In
-          </Link>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container" style={{ maxWidth: '460px', padding: '3rem 1rem' }}>
-      <motion.div
-        className="auth-card"
-        initial={{ opacity: 0, scale: 0.97, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
-      >
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: COLOR_PALETTE.textDark, marginBottom: '0.25rem' }}>
-            {AUTH_LABELS.registerTitle}
-          </h2>
-          <p style={{ color: COLOR_PALETTE.textSecondary, fontSize: '0.875rem' }}>
-            {AUTH_LABELS.registerSubtitle}
-          </p>
+    <div className="flex min-h-[calc(100vh-4.5rem)] items-stretch bg-ink-50/40">
+      <div className="container flex flex-1 items-center py-12 sm:py-16">
+        <div className="mx-auto grid w-full max-w-4xl grid-cols-1 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-lg lg:grid-cols-2">
+          {/* Brand panel */}
+          <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-ink-900 via-ink-900 to-brand-900 p-10 text-white lg:flex">
+            <div className="bg-grid pointer-events-none absolute inset-0 opacity-30" aria-hidden="true" />
+            <div className="relative">
+              <Logo tone="dark" />
+              <p className="mt-8 max-w-xs text-balance font-display text-2xl font-semibold leading-snug">
+                Join a verified procurement network.
+              </p>
+              <ul className="mt-8 flex flex-col gap-3.5">
+                {TRUST_POINTS.map((point) => (
+                  <li key={point} className="flex items-start gap-2.5 text-[13.5px] text-ink-200">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="relative">
+              <PulseLine width={200} strokeWidth={1.75} strokeClassName="stroke-brand-400" />
+              <p className="mt-4 text-[12px] text-ink-400">{BRAND_CONFIG.slogan}</p>
+            </div>
+          </div>
+
+          {/* Form panel */}
+          <div className="flex flex-col justify-center p-8 sm:p-10">
+            <AnimatePresence mode="wait">
+              {success ? (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex flex-col items-start"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+                    <PartyPopper className="h-6 w-6" />
+                  </span>
+                  <h1 className="mt-4 font-display text-2xl font-semibold text-ink-900">Registration Complete</h1>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-500">
+                    Your organization profile has been submitted. Once verified, you&apos;ll be able to request
+                    quotations through {BRAND_CONFIG.name}.
+                  </p>
+                  <Button asChild variant="brand" size="lg" className="mt-6 w-full">
+                    <Link href="/login">
+                      Proceed to Sign In
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="form"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <div className="mb-2 lg:hidden">
+                    <Logo />
+                  </div>
+                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-700">
+                    <ShieldCheck className="h-3 w-3" />
+                    Organization Registration
+                  </span>
+                  <h1 className="mt-3 font-display text-2xl font-semibold text-ink-900">{AUTH_LABELS.registerTitle}</h1>
+                  <p className="mt-1 text-sm text-ink-500">{AUTH_LABELS.registerSubtitle}</p>
+
+                  <AnimatePresence>
+                    {errorMsg && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: 'auto' }}
+                        exit={{ opacity: 0, y: -4, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="mt-5 overflow-hidden"
+                      >
+                        <Alert variant="error">{errorMsg}</Alert>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <form onSubmit={handleRegister} className="mt-6 flex flex-col gap-4">
+                    <div>
+                      <Label htmlFor="orgName">{AUTH_LABELS.nameLabel}</Label>
+                      <Input
+                        id="orgName"
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        disabled={submitting}
+                        placeholder="e.g. Hope General Hospital"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="license">{AUTH_LABELS.licenseLabel}</Label>
+                      <Input
+                        id="license"
+                        type="text"
+                        value={license}
+                        onChange={(e) => setLicense(e.target.value)}
+                        disabled={submitting}
+                        placeholder="e.g. LIC-998877"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="regEmail">{AUTH_LABELS.emailLabel}</Label>
+                      <Input
+                        id="regEmail"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={submitting}
+                        placeholder="you@organization.com"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="regPassword">{AUTH_LABELS.passwordLabel}</Label>
+                      <Input
+                        id="regPassword"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={submitting}
+                        required
+                      />
+                    </div>
+
+                    <Button type="submit" disabled={submitting} variant="brand" size="lg" className="mt-2 w-full">
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          {AUTH_LABELS.submitRegister}
+                          <ArrowRight className="h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+
+                  <p className="mt-6 text-center text-sm text-ink-500">
+                    {AUTH_LABELS.haveAccount}{' '}
+                    <Link href="/login" className="font-semibold text-brand-700 hover:text-brand-800">
+                      Sign in here
+                    </Link>
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-
-        <AnimatePresence>
-          {errorMsg && (
-            <motion.div
-              className="alert alert-error"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2 }}
-            >
-              <span>{errorMsg}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <form onSubmit={handleRegister}>
-          <div className="form-group">
-            <label className="form-label">{AUTH_LABELS.nameLabel}</label>
-            <input
-              type="text"
-              className="form-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={submitting}
-              placeholder="e.g. Hope General Hospital"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">{AUTH_LABELS.licenseLabel}</label>
-            <input
-              type="text"
-              className="form-input"
-              value={license}
-              onChange={(e) => setLicense(e.target.value)}
-              disabled={submitting}
-              placeholder="e.g. LIC-998877"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">{AUTH_LABELS.emailLabel}</label>
-            <input
-              type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={submitting}
-              placeholder="you@organization.com"
-              required
-            />
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '2rem' }}>
-            <label className="form-label">{AUTH_LABELS.passwordLabel}</label>
-            <input
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={submitting}
-              required
-            />
-          </div>
-
-          <motion.button
-            type="submit"
-            disabled={submitting}
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '0.6rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-            whileTap={!submitting ? { scale: 0.97 } : {}}
-          >
-            {submitting && <span className="spinner" />}
-            {submitting ? 'Submitting...' : AUTH_LABELS.submitRegister}
-          </motion.button>
-        </form>
-
-        <div style={{ textAlign: 'center', fontSize: '0.875rem', color: COLOR_PALETTE.textSecondary, marginTop: '1rem' }}>
-          <span>{AUTH_LABELS.haveAccount} </span>
-          <Link href="/login" style={{ color: COLOR_PALETTE.primary, fontWeight: 500 }}>
-            Sign in here
-          </Link>
-        </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
