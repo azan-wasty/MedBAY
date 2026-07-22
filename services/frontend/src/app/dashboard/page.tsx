@@ -22,6 +22,7 @@ import {
 import type { RFQItem, User, RFQDetail, OrderTracking } from '@/lib/odooClient';
 import { Container } from '@/components/shared/Container';
 import { OrderStepper } from '@/components/dashboard/OrderStepper';
+import { BuyerOverview } from '@/components/dashboard/BuyerOverview';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
@@ -281,7 +282,9 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[260px_1fr] lg:gap-8">
+        <BuyerOverview rfqItems={rfqItems} onSelectRFQ={handleOpenRFQ} />
+
+        <div id="rfq-list" className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[260px_1fr] lg:gap-8 scroll-mt-20">
           {/* Company card */}
           <div className="rounded-xl border border-ink-100 bg-white p-5 lg:sticky lg:top-24">
             <h3 className="mb-4 border-b border-ink-100 pb-3 font-display text-[14px] font-semibold text-ink-900">
@@ -430,28 +433,50 @@ export default function DashboardPage() {
                 <h4 className="mb-2.5 text-[13px] font-semibold text-ink-900">Items Quoted</h4>
                 <div className="mb-5 overflow-hidden rounded-lg border border-ink-100">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[420px] text-left text-[13px]">
+                    <table className="w-full min-w-[480px] text-left text-[13px]">
                       <thead>
                         <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                           <th className="px-3 py-2.5">Product Name</th>
                           <th className="px-3 py-2.5 text-center">Qty</th>
-                          <th className="px-3 py-2.5 text-right">Unit Price</th>
+                          <th className="px-3 py-2.5 text-right">Your Target</th>
+                          <th className="px-3 py-2.5 text-right">Quoted Price</th>
                           <th className="px-3 py-2.5 text-right">Subtotal</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {rfqDetail.lines.map((line) => (
-                          <tr key={line.id} className="border-b border-ink-100 last:border-b-0">
-                            <td className="px-3 py-2.5 font-medium text-ink-900">{line.product_name}</td>
-                            <td className="px-3 py-2.5 text-center text-ink-600">{line.product_uom_qty}</td>
-                            <td className="px-3 py-2.5 text-right text-ink-600">
-                              {line.price_unit > 0 ? `$${line.price_unit.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'Pending Quote'}
-                            </td>
-                            <td className="px-3 py-2.5 text-right font-medium text-ink-900">
-                              {line.price_subtotal > 0 ? `$${line.price_subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
-                            </td>
-                          </tr>
-                        ))}
+                        {rfqDetail.lines.map((line) => {
+                          const hasTarget = line.target_price_unit && line.target_price_unit > 0;
+                          const isAboveTarget =
+                            hasTarget && line.price_unit > 0 && line.price_unit > line.target_price_unit!;
+                          return (
+                            <tr key={line.id} className="border-b border-ink-100 last:border-b-0">
+                              <td className="px-3 py-2.5 font-medium text-ink-900">{line.product_name}</td>
+                              <td className="px-3 py-2.5 text-center text-ink-600">{line.product_uom_qty}</td>
+                              <td className="px-3 py-2.5 text-right text-ink-400">
+                                {hasTarget
+                                  ? `$${line.target_price_unit!.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                  : <span className="text-ink-300">—</span>}
+                              </td>
+                              <td className={`px-3 py-2.5 text-right ${
+                                isAboveTarget ? 'text-amber-600 font-semibold' : 'text-ink-600'
+                              }`}>
+                                {line.price_unit > 0
+                                  ? `$${line.price_unit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                  : 'Pending Quote'}
+                                {isAboveTarget && (
+                                  <span className="ml-1.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                                    above target
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-medium text-ink-900">
+                                {line.price_subtotal > 0
+                                  ? `$${line.price_subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                  : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -465,6 +490,15 @@ export default function DashboardPage() {
                       : 'Pending Admin Pricing'}
                   </strong>
                 </div>
+
+                {rfqDetail.buyer_notes && (
+                  <div className="mb-4 rounded-lg border border-brand-100 bg-brand-50/40 px-4 py-3">
+                    <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-wide text-brand-600">
+                      Your Procurement Notes
+                    </span>
+                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-700">{rfqDetail.buyer_notes}</p>
+                  </div>
+                )}
 
                 {rfqDetail.state === 'draft' && (
                   <Alert variant="info" icon>

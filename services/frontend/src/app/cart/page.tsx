@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
-import { Minus, Plus, Trash2, ArrowRight, Loader2, PackageCheck, ShoppingCart } from 'lucide-react';
+import { Minus, Plus, Trash2, ArrowRight, Loader2, PackageCheck, ShoppingCart, MessageSquare } from 'lucide-react';
 
 import { CART_LABELS, AUTH_LABELS } from '@/lib/constants';
 import { Container } from '@/components/shared/Container';
@@ -18,6 +18,7 @@ interface CartItem {
   price: number;
   variantId?: number;
   variantLabel?: string;
+  targetPrice?: number;
 }
 
 const alertVariants: Variants = {
@@ -33,6 +34,7 @@ export default function CartPage() {
   const [success, setSuccess] = useState<boolean>(false);
   const [submittedRfq, setSubmittedRfq] = useState<{ id?: number; name?: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [buyerNotes, setBuyerNotes] = useState<string>('');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('med_user');
@@ -65,6 +67,15 @@ export default function CartPage() {
     window.dispatchEvent(new Event('cart-updated'));
   };
 
+  const handleUpdateTargetPrice = (itemId: number, raw: string) => {
+    const val = parseFloat(raw);
+    const updated = cartItems.map((item) =>
+      item.id === itemId ? { ...item, targetPrice: isNaN(val) || val <= 0 ? undefined : val } : item
+    );
+    setCartItems(updated);
+    localStorage.setItem('med_cart', JSON.stringify(updated));
+  };
+
   const handleRemoveItem = (itemId: number) => {
     const filtered = cartItems.filter((item) => item.id !== itemId);
     setCartItems(filtered);
@@ -92,12 +103,13 @@ export default function CartPage() {
         product_id: item.id,
         ...(item.variantId ? { variant_id: item.variantId } : {}),
         quantity: item.quantity,
+        ...(item.targetPrice && item.targetPrice > 0 ? { target_price: item.targetPrice } : {}),
       }));
 
       const res = await fetch('/api/rfq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, notes: buyerNotes.trim() }),
       });
 
       const data = await res.json();
@@ -204,7 +216,8 @@ export default function CartPage() {
             </Button>
           </motion.div>
         ) : (
-          <div className="mt-8 grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_320px]">
+          <div className="mt-8 grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_340px]">
+            {/* ── Item list ── */}
             <div className="min-w-0 overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
               <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
                 <span className="text-sm font-medium text-ink-600">
@@ -218,6 +231,14 @@ export default function CartPage() {
                 </button>
               </div>
 
+              {/* Column headers */}
+              <div className="hidden grid-cols-[1fr_auto_140px_36px] items-center gap-3 border-b border-ink-100 bg-ink-50/60 px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400 sm:grid">
+                <span>Product</span>
+                <span className="text-center">Qty</span>
+                <span className="text-center">Your Target Price / unit</span>
+                <span />
+              </div>
+
               <ul>
                 <AnimatePresence initial={false}>
                   {cartItems.map((item) => (
@@ -228,9 +249,10 @@ export default function CartPage() {
                       exit={{ opacity: 0, x: 12, height: 0, transition: { duration: 0.2 } }}
                       transition={{ duration: 0.25 }}
                       layout
-                      className="flex flex-col gap-3 border-b border-ink-100 px-5 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                      className="flex flex-col gap-3 border-b border-ink-100 px-5 py-4 last:border-b-0 sm:grid sm:grid-cols-[1fr_auto_140px_36px] sm:items-center sm:gap-3"
                     >
-                      <div className="min-w-0 flex-1">
+                      {/* Name */}
+                      <div className="min-w-0">
                         <Link
                           href={`/products/${item.id}`}
                           className="line-clamp-1 text-[14px] font-medium text-ink-900 hover:text-brand-700"
@@ -240,46 +262,62 @@ export default function CartPage() {
                         {item.variantLabel && <p className="mt-0.5 text-xs text-ink-500">{item.variantLabel}</p>}
                       </div>
 
-                      <div className="flex items-center justify-between gap-4 sm:justify-end">
-                        <div className="flex items-center gap-1 rounded-md border border-ink-200 p-0.5">
-                          <button
-                            onClick={() => handleUpdateQty(item.id, item.quantity - 1)}
-                            aria-label="Decrease quantity"
-                            className="flex h-7 w-7 items-center justify-center rounded text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </button>
-                          <span className="w-8 text-center text-sm font-medium text-ink-900">{item.quantity}</span>
-                          <button
-                            onClick={() => handleUpdateQty(item.id, item.quantity + 1)}
-                            aria-label="Increase quantity"
-                            className="flex h-7 w-7 items-center justify-center rounded text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-
+                      {/* Qty stepper */}
+                      <div className="flex items-center gap-1 rounded-md border border-ink-200 p-0.5">
                         <button
-                          onClick={() => handleRemoveItem(item.id)}
-                          aria-label={`Remove ${item.name}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          onClick={() => handleUpdateQty(item.id, item.quantity - 1)}
+                          aria-label="Decrease quantity"
+                          className="flex h-7 w-7 items-center justify-center rounded text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="w-8 text-center text-sm font-medium text-ink-900">{item.quantity}</span>
+                        <button
+                          onClick={() => handleUpdateQty(item.id, item.quantity + 1)}
+                          aria-label="Increase quantity"
+                          className="flex h-7 w-7 items-center justify-center rounded text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
+
+                      {/* Target price input */}
+                      <div className="flex items-center gap-1.5 rounded-md border border-ink-200 bg-white px-2.5 py-1.5 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100">
+                        <span className="text-xs text-ink-400">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Optional"
+                          value={item.targetPrice ?? ''}
+                          onChange={(e) => handleUpdateTargetPrice(item.id, e.target.value)}
+                          aria-label={`Target price for ${item.name}`}
+                          className="w-full min-w-0 bg-transparent text-[13px] font-medium text-ink-900 placeholder:text-ink-300 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Remove */}
+                      <button
+                        onClick={() => handleRemoveItem(item.id)}
+                        aria-label={`Remove ${item.name}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </motion.li>
                   ))}
                 </AnimatePresence>
               </ul>
             </div>
 
+            {/* ── Summary / submit panel ── */}
             <div className="rounded-xl border border-ink-100 bg-white p-6 shadow-soft-xs lg:sticky lg:top-24">
               <h3 className="border-b border-ink-100 pb-3 font-display text-[15px] font-semibold text-ink-900">
                 Quote Summary
               </h3>
               <p className="mt-3 text-[12.5px] leading-relaxed text-ink-500">
-                Final pricing is determined on a quote-by-quote basis depending on quantities and your
-                organization&apos;s profile.
+                Final pricing is determined on a quote-by-quote basis. You may propose a target unit price per item
+                above — the admin will review and counter-quote if needed.
               </p>
 
               <div className="mt-5 flex flex-col gap-2.5">
@@ -291,6 +329,25 @@ export default function CartPage() {
                   <span className="text-ink-500">Total Items</span>
                   <strong className="font-medium text-ink-900">{totalItems}</strong>
                 </div>
+              </div>
+
+              {/* Buyer notes */}
+              <div className="mt-5">
+                <label
+                  htmlFor="buyer-notes"
+                  className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-400"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  Procurement Notes <span className="font-normal normal-case text-ink-300">(optional)</span>
+                </label>
+                <textarea
+                  id="buyer-notes"
+                  rows={3}
+                  placeholder="E.g. Required by Aug 15 · requesting 10% volume discount for quarterly contract..."
+                  value={buyerNotes}
+                  onChange={(e) => setBuyerNotes(e.target.value)}
+                  className="w-full resize-none rounded-lg border border-ink-200 bg-ink-50/40 px-3 py-2.5 text-[13px] text-ink-900 placeholder:text-ink-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                />
               </div>
 
               <Button onClick={handleSubmitRFQ} disabled={submitting} variant="brand" size="lg" className="mt-6 w-full">

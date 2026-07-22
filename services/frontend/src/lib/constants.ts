@@ -166,7 +166,41 @@ export const RETURNS_LABELS = {
   tableStatus: "Status",
   tableDate: "Requested",
 };
-
+export const ADMIN_OVERVIEW_LABELS = {
+  title: "Marketplace Overview",
+  subtitle: "A live snapshot across suppliers, returns, and fulfillment.",
+  totalCompanies: "Total Companies",
+  pendingReview: "pending review",
+  verifiedSuppliers: "Verified Suppliers",
+  ofTotal: "of total",
+  activeReturns: "Active Returns",
+  awaitingAction: "awaiting action",
+  awaitingShipment: "Awaiting Shipment",
+  ordersConfirmed: "confirmed orders",
+  verificationChartTitle: "Verification Status",
+  reasonChartTitle: "Returns by Reason",
+  resolutionChartTitle: "Refund vs. Replacement",
+  fulfillmentChartTitle: "Fulfillment Progress",
+  noCompanyData: "No companies registered yet.",
+  noReturnData: "No return requests yet.",
+  noOrderData: "No confirmed orders yet.",
+  clickToFilter: "Click a segment to jump to filtered records",
+};
+export const BUYER_OVERVIEW_LABELS = {
+  title: "Procurement & RFQ Insights",
+  subtitle: "A real-time overview of your requested quotations, active orders, and procurement volume.",
+  totalRfqs: "Total RFQs Submitted",
+  readyForApproval: "Action Required",
+  quotesToApprove: "quotes awaiting your approval",
+  confirmedOrders: "Confirmed Orders",
+  activeProcurement: "in fulfillment pipeline",
+  totalSpend: "Total Quoted Value",
+  statusChartTitle: "RFQ Status Breakdown",
+  spendChartTitle: "Order Value History ($)",
+  quickActionsTitle: "Procurement Shortcuts",
+  noRfqData: "No quotation history available.",
+  noSpendData: "No spend history available.",
+};
 export const ADMIN_RETURNS_LABELS = {
   filterAll: "All",
   filterUnderReview: "Under Review",

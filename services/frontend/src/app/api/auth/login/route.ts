@@ -28,10 +28,13 @@ export async function POST(request: Request) {
         path: '/',
       });
 
+      // Deliberately NOT returning session_id in the body: it's already set
+      // as an httpOnly cookie above, and echoing it back here would let any
+      // XSS on the page read it out of the JSON response (or a client-side
+      // mirror of it) and bypass httpOnly entirely.
       return NextResponse.json({
         success: true,
         user: result.user,
-        session_id: result.session_id, // also return to store client-side if needed
       });
     }
 

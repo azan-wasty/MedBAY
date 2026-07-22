@@ -11,6 +11,24 @@ _logger = logging.getLogger(__name__)
 ODOO_DB_NAME = os.environ.get('ODOO_DB_NAME', 'odoo')
 ADMIN_GROUP_XMLID = 'medical_marketplace.group_marketplace_admin'
 
+# Comma-separated list of origins allowed to make credentialed cross-origin
+# requests to the /api/* endpoints, e.g. "http://localhost:3000,https://medbay.example.com".
+# Reflecting an arbitrary request Origin here (with Allow-Credentials: true)
+# would let any website ride a logged-in user's session cookie, so we only
+# ever echo back an Origin that's explicitly on this list.
+_ALLOWED_ORIGINS = {
+    origin.strip()
+    for origin in os.environ.get('MARKETPLACE_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+    if origin.strip()
+}
+
+
+def _allowed_origin(request_origin):
+    """Return request_origin if it's on the allow-list, else None."""
+    if request_origin and request_origin in _ALLOWED_ORIGINS:
+        return request_origin
+    return None
+
 
 class MedicalMarketplaceController(http.Controller):
 
@@ -28,7 +46,7 @@ class MedicalMarketplaceController(http.Controller):
                 return val.decode('utf-8')
             return val
 
-        origin = request.httprequest.headers.get('Origin')
+        origin = _allowed_origin(request.httprequest.headers.get('Origin'))
         headers = [
             ('Content-Type', 'application/json'),
             ('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'),
@@ -105,16 +123,15 @@ class MedicalMarketplaceController(http.Controller):
 
     @http.route('/api/<path:subpath>', type='http', auth='none', methods=['OPTIONS'], csrf=False)
     def api_options(self, **kwargs):
-        origin = request.httprequest.headers.get('Origin', '*')
-        return request.make_response(
-            '',
-            headers=[
-                ('Access-Control-Allow-Origin', origin),
-                ('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'),
-                ('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie'),
-                ('Access-Control-Allow-Credentials', 'true'),
-            ]
-        )
+        origin = _allowed_origin(request.httprequest.headers.get('Origin'))
+        headers = [
+            ('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'),
+            ('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie'),
+        ]
+        if origin:
+            headers.append(('Access-Control-Allow-Origin', origin))
+            headers.append(('Access-Control-Allow-Credentials', 'true'))
+        return request.make_response('', headers=headers)
 
     # ------------------------------------------------------------------
     # Products
@@ -381,22 +398,26 @@ class MedicalMarketplaceController(http.Controller):
             user = request.env.user
             partner = user.partner_id
 
-            # Temporarily bypass verification check so you can test the RFQ email flow
-            # if partner.verification_status != 'verified':
-            #     return self._json_response(
-            #         {'error': 'Your company must be verified before submitting RFQs.',
-            #          'verification_status': partner.verification_status},
-            #         status=403
-            #     )
+            require_verification = self._get_config_param(
+                'medical_marketplace.require_verification_for_rfq', 'True'
+            ) == 'True'
+            if require_verification and partner.verification_status != 'verified':
+                return self._json_response(
+                    {'error': 'Your company must be verified before submitting RFQs.',
+                     'verification_status': partner.verification_status},
+                    status=403
+                )
 
             body = json.loads(request.httprequest.data)
             items = body.get('items', [])
+            notes = str(body.get('notes', body.get('buyer_notes', ''))).strip()
 
             if not items:
                 return self._json_response({'error': 'No items specified'}, status=400)
 
             sale_order = request.env['sale.order'].sudo().create({
                 'partner_id': partner.id,
+                'buyer_notes': notes or False,
             })
 
             for item in items:
@@ -416,10 +437,13 @@ class MedicalMarketplaceController(http.Controller):
                 if not variant:
                     variant = product_template.product_variant_id
 
+                target_price = float(item.get('target_price', item.get('target_price_unit', 0.0)))
+
                 request.env['sale.order.line'].sudo().create({
                     'order_id': sale_order.id,
                     'product_id': variant.id,
                     'product_uom_qty': item.get('quantity', 1),
+                    'target_price_unit': target_price if target_price > 0 else False,
                 })
 
             return self._json_response({
@@ -532,6 +556,7 @@ class MedicalMarketplaceController(http.Controller):
                     'product_uom_qty': line.product_uom_qty,
                     'price_unit': line.price_unit,
                     'price_subtotal': line.price_subtotal,
+                    'target_price_unit': line.target_price_unit or None,
                 })
 
             return self._json_response({
@@ -540,6 +565,7 @@ class MedicalMarketplaceController(http.Controller):
                 'state': order.state,
                 'date_order': order.date_order,
                 'amount_total': order.amount_total,
+                'buyer_notes': order.buyer_notes or None,
                 'lines': lines,
             })
         except Exception as e:
@@ -799,7 +825,16 @@ class MedicalMarketplaceController(http.Controller):
         if not order.exists():
             return self._json_response({'error': 'RFQ not found'}, status=404)
 
-        lines = order.order_line.sudo().read(['id', 'product_id', 'product_uom_qty', 'price_unit', 'price_subtotal'])
+        lines = []
+        for line in order.order_line.sudo():
+            lines.append({
+                'id': line.id,
+                'product_id': (line.product_id.id, line.product_id.display_name),
+                'product_uom_qty': line.product_uom_qty,
+                'price_unit': line.price_unit,
+                'price_subtotal': line.price_subtotal,
+                'target_price_unit': line.target_price_unit or None,
+            })
         return self._json_response({
             'id': order.id,
             'name': order.name,
@@ -807,6 +842,7 @@ class MedicalMarketplaceController(http.Controller):
             'partner_id': order.partner_id.id,
             'partner_name': order.partner_id.name,
             'amount_total': order.amount_total,
+            'buyer_notes': order.buyer_notes or None,
             'lines': lines,
         })
 

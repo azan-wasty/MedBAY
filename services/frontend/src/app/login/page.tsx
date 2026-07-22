@@ -51,9 +51,10 @@ export default function LoginPage() {
         throw new Error(data.error || 'Authentication failed. Please verify credentials.');
       }
 
-      // Success - save user details in localStorage
+      // Success - save non-sensitive user display info for the UI.
+      // The actual session lives only in the httpOnly `med_session` cookie
+      // set by the server — it's never exposed to client-side JS.
       localStorage.setItem('med_user', JSON.stringify(data.user));
-      localStorage.setItem('med_session', data.session_id);
 
       // Dispatch custom auth-updated event to update the navigation bar dynamically
       window.dispatchEvent(new Event('auth-updated'));

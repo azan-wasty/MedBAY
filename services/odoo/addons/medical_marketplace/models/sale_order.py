@@ -51,6 +51,10 @@ class SaleOrder(models.Model):
     review_ids = fields.One2many(
         'medical.order.review', 'sale_order_id', string='Reviews',
     )
+    buyer_notes = fields.Text(
+        string='Buyer Notes',
+        help='Special instructions, target budget, or delivery timeline requests from the buyer.',
+    )
 
     # ------------------------------------------------------------------
     # Existing: quotation notification (unchanged)
@@ -89,3 +93,12 @@ class SaleOrder(models.Model):
             return
         template.sudo().send_mail(self.id, force_send=True)
         _logger.info("Sent RFQ-quoted notification for %s to %s", self.name, self.partner_id.email)
+
+
+class SaleOrderLine(models.Model):
+    _inherit = 'sale.order.line'
+
+    target_price_unit = fields.Float(
+        string='Buyer Proposed Target Price',
+        help='Target unit price requested by the buyer during RFQ submission.',
+    )

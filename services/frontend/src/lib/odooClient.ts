@@ -112,6 +112,7 @@ export interface RFQLine {
   product_uom_qty: number;
   price_unit: number;
   price_subtotal: number;
+  target_price_unit?: number | null;
 }
 
 export interface RFQDetail {
@@ -120,6 +121,7 @@ export interface RFQDetail {
   state: string;
   date_order: string;
   amount_total: number;
+  buyer_notes?: string | null;
   lines: RFQLine[];
 }
 
@@ -595,3 +597,10 @@ export const odooClient = {
     });
   },
 };
+// Admin-only view of a confirmed order, as returned by GET /api/rfq?state=sale
+// for the admin console's Order Tracking & Shipping tab.
+export interface AdminOrder extends RFQItem {
+  partner_id: [number, string] | boolean;
+  carrier_id?: [number, string] | boolean;
+  tracking_reference?: string | boolean;
+}

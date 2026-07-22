@@ -13,7 +13,7 @@ import {
   RETURN_STATUS_MAP,
   TRACKING_LABELS,
 } from '@/lib/constants';
-import type { CompanyPartner, AdminReturnRequest, RFQItem, Carrier, User } from '@/lib/odooClient';
+import type { CompanyPartner, AdminReturnRequest, RFQItem, Carrier, User, AdminOrder } from '@/lib/odooClient';
 import { Container } from '@/components/shared/Container';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/badge';
@@ -25,12 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog';
-
-export interface AdminOrder extends RFQItem {
-  partner_id: [number, string] | boolean;
-  carrier_id?: [number, string] | boolean;
-  tracking_reference?: string | boolean;
-}
+import { AdminOverview } from '@/components/admin/AdminOverview';
 
 type TabValue = 'companies' | 'returns' | 'tracking';
 type CompanyFilterValue = '' | 'pending' | 'verified' | 'rejected';
@@ -94,6 +89,7 @@ export default function AdminPage() {
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [refreshSignal, setRefreshSignal] = useState(0);
 
   const [companyFilter, setCompanyFilter] = useState<CompanyFilterValue>('');
   const [companies, setCompanies] = useState<CompanyPartner[]>([]);
@@ -209,6 +205,29 @@ export default function AdminPage() {
     }
   };
 
+  // Lets the overview's KPI cards and chart segments jump straight into a
+  // filtered tab view, instead of just switching tabs blind.
+  const handleOverviewNavigate = (tab: TabValue, filter?: string) => {
+    if (tab === 'companies') {
+      const f = (filter as CompanyFilterValue) ?? companyFilter;
+      setCompanyFilter(f);
+      setActiveTab('companies');
+      setErrorMsg('');
+      setSuccessMsg('');
+      loadCompanies(f);
+    } else if (tab === 'returns') {
+      const f = (filter as ReturnFilterValue) ?? returnFilter;
+      setReturnFilter(f);
+      setActiveTab('returns');
+      setErrorMsg('');
+      setSuccessMsg('');
+      loadReturns(f);
+    } else {
+      handleTabChange(tab);
+    }
+    document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleVerifyCompany = async (companyId: number) => {
     try {
       setActioningCompanyId(companyId);
@@ -218,6 +237,7 @@ export default function AdminPage() {
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to verify company');
       setCompanies((prev) => prev.map((c) => (c.id === companyId ? { ...c, verification_status: 'verified' } : c)));
       setSuccessMsg('Company verified successfully.');
+      setRefreshSignal((s) => s + 1);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to verify company.');
     } finally {
@@ -241,6 +261,7 @@ export default function AdminPage() {
       setRejectTarget(null);
       setRejectReason('');
       setSuccessMsg('Company verification rejected.');
+      setRefreshSignal((s) => s + 1);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to reject company.');
     } finally {
@@ -257,6 +278,7 @@ export default function AdminPage() {
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to approve return request');
       setReturns((prev) => prev.map((r) => (r.id === returnId ? { ...r, state: 'approved' } : r)));
       setSuccessMsg('Return request approved. Incoming shipment generated.');
+      setRefreshSignal((s) => s + 1);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to approve return request.');
     } finally {
@@ -273,6 +295,7 @@ export default function AdminPage() {
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to reject return request');
       setReturns((prev) => prev.map((r) => (r.id === returnId ? { ...r, state: 'rejected' } : r)));
       setSuccessMsg('Return request rejected.');
+      setRefreshSignal((s) => s + 1);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to reject return request.');
     } finally {
@@ -316,6 +339,7 @@ export default function AdminPage() {
       setTrackingCarrierId('');
       setTrackingReference('');
       loadOrders();
+      setRefreshSignal((s) => s + 1);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to update tracking information.');
     } finally {
@@ -352,283 +376,287 @@ export default function AdminPage() {
           </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <div className="overflow-x-auto pb-1">
-            <TabsList>
-              <TabsTrigger value="companies">
-                <Building2 className="mr-1.5 h-3.5 w-3.5" />
-                Company Verification
-              </TabsTrigger>
-              <TabsTrigger value="returns">
-                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                Return Requests
-              </TabsTrigger>
-              <TabsTrigger value="tracking">
-                <Truck className="mr-1.5 h-3.5 w-3.5" />
-                Order Tracking &amp; Shipping
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        <AdminOverview refreshSignal={refreshSignal} onNavigate={handleOverviewNavigate} />
 
-          <div className="mt-6">
-            <AnimatePresence>
-              {errorMsg && (
-                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-5">
-                  <Alert variant="error">{errorMsg}</Alert>
-                </motion.div>
-              )}
-              {successMsg && (
-                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-5">
-                  <Alert variant="success">{successMsg}</Alert>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+        <div id="admin-tabs" className="scroll-mt-20">
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <div className="overflow-x-auto pb-1">
+              <TabsList>
+                <TabsTrigger value="companies">
+                  <Building2 className="mr-1.5 h-3.5 w-3.5" />
+                  Company Verification
+                </TabsTrigger>
+                <TabsTrigger value="returns">
+                  <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                  Return Requests
+                </TabsTrigger>
+                <TabsTrigger value="tracking">
+                  <Truck className="mr-1.5 h-3.5 w-3.5" />
+                  Order Tracking &amp; Shipping
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          {/* TAB 1: COMPANY VERIFICATION */}
-          <TabsContent value="companies">
-            <FilterPills
-              filters={COMPANY_FILTERS}
-              active={companyFilter}
-              onChange={(v) => {
-                setCompanyFilter(v);
-                loadCompanies(v);
-              }}
-            />
+            <div className="mt-6">
+              <AnimatePresence>
+                {errorMsg && (
+                  <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-5">
+                    <Alert variant="error">{errorMsg}</Alert>
+                  </motion.div>
+                )}
+                {successMsg && (
+                  <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-5">
+                    <Alert variant="success">{successMsg}</Alert>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            {companiesLoading ? (
-              <Skeleton className="h-56 w-full rounded-xl" />
-            ) : companies.length === 0 ? (
-              <EmptyPanel message={ADMIN_COMPANIES_LABELS.noCompanies} />
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-left text-[13px]">
-                    <thead>
-                      <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-                        <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableName}</th>
-                        <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableEmail}</th>
-                        <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableReg}</th>
-                        <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableStatus}</th>
-                        <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableDate}</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <AnimatePresence initial={false}>
-                        {companies.map((c) => {
-                          const statusConfig = COMPANY_STATUS_MAP[c.verification_status] || {
-                            label: c.verification_status,
-                            bg: '#f1f5f9',
-                            text: '#475569',
-                          };
-                          return (
-                            <motion.tr
-                              key={c.id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40"
-                            >
-                              <td className="px-4 py-3 font-medium text-ink-900">{c.name}</td>
-                              <td className="px-4 py-3 text-ink-500">{c.email || '—'}</td>
-                              <td className="px-4 py-3 text-ink-600">{c.registration_number || '—'}</td>
-                              <td className="px-4 py-3">
-                                <StatusBadge config={statusConfig} />
-                              </td>
-                              <td className="px-4 py-3 text-ink-500">{new Date(c.create_date).toLocaleDateString()}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="brand"
-                                    onClick={() => handleVerifyCompany(c.id)}
-                                    disabled={actioningCompanyId === c.id || c.verification_status === 'verified'}
-                                  >
-                                    {ADMIN_COMPANIES_LABELS.verifyButton}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => {
-                                      setRejectTarget(c);
-                                      setRejectReason('');
-                                    }}
-                                    disabled={actioningCompanyId === c.id || c.verification_status === 'rejected'}
-                                  >
-                                    {ADMIN_COMPANIES_LABELS.rejectButton}
-                                  </Button>
-                                </div>
-                              </td>
-                            </motion.tr>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </TabsContent>
+            {/* TAB 1: COMPANY VERIFICATION */}
+            <TabsContent value="companies">
+              <FilterPills
+                filters={COMPANY_FILTERS}
+                active={companyFilter}
+                onChange={(v) => {
+                  setCompanyFilter(v);
+                  loadCompanies(v);
+                }}
+              />
 
-          {/* TAB 2: RETURN REQUESTS */}
-          <TabsContent value="returns">
-            <FilterPills
-              filters={RETURN_FILTERS}
-              active={returnFilter}
-              onChange={(v) => {
-                setReturnFilter(v);
-                loadReturns(v);
-              }}
-            />
-
-            {returnsLoading ? (
-              <Skeleton className="h-56 w-full rounded-xl" />
-            ) : returns.length === 0 ? (
-              <EmptyPanel message={ADMIN_RETURNS_LABELS.noReturns} />
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[920px] text-left text-[13px]">
-                    <thead>
-                      <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-                        <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableRef}</th>
-                        <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableOrder}</th>
-                        <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableCompany}</th>
-                        <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableProduct}</th>
-                        <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableReason}</th>
-                        <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableType}</th>
-                        <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableStatus}</th>
-                        <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableDate}</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <AnimatePresence initial={false}>
-                        {returns.map((r) => {
-                          const statusConfig = RETURN_STATUS_MAP[r.state] || { label: r.state, bg: '#f1f5f9', text: '#475569' };
-                          return (
-                            <motion.tr
-                              key={r.id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40"
-                            >
-                              <td className="px-4 py-3 font-data font-medium text-ink-900">{r.name}</td>
-                              <td className="px-4 py-3 text-ink-600">{r.sale_order_name || '—'}</td>
-                              <td className="px-4 py-3 text-ink-500">{r.partner_name || '—'}</td>
-                              <td className="px-4 py-3">
-                                <div className="font-medium text-ink-900">{r.product_name}</div>
-                                <div className="text-xs text-ink-400">Qty: {r.quantity}</div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="text-ink-600">{r.reason_category || '—'}</div>
-                                {r.reason_detail && (
-                                  <div
-                                    className="max-w-[200px] truncate text-xs italic text-ink-400"
-                                    title={r.reason_detail}
-                                  >
-                                    {r.reason_detail}
+              {companiesLoading ? (
+                <Skeleton className="h-56 w-full rounded-xl" />
+              ) : companies.length === 0 ? (
+                <EmptyPanel message={ADMIN_COMPANIES_LABELS.noCompanies} />
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-left text-[13px]">
+                      <thead>
+                        <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                          <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableName}</th>
+                          <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableEmail}</th>
+                          <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableReg}</th>
+                          <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableStatus}</th>
+                          <th className="px-4 py-3">{ADMIN_COMPANIES_LABELS.tableDate}</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <AnimatePresence initial={false}>
+                          {companies.map((c) => {
+                            const statusConfig = COMPANY_STATUS_MAP[c.verification_status] || {
+                              label: c.verification_status,
+                              bg: '#f1f5f9',
+                              text: '#475569',
+                            };
+                            return (
+                              <motion.tr
+                                key={c.id}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40"
+                              >
+                                <td className="px-4 py-3 font-medium text-ink-900">{c.name}</td>
+                                <td className="px-4 py-3 text-ink-500">{c.email || '—'}</td>
+                                <td className="px-4 py-3 text-ink-600">{c.registration_number || '—'}</td>
+                                <td className="px-4 py-3">
+                                  <StatusBadge config={statusConfig} />
+                                </td>
+                                <td className="px-4 py-3 text-ink-500">{new Date(c.create_date).toLocaleDateString()}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="brand"
+                                      onClick={() => handleVerifyCompany(c.id)}
+                                      disabled={actioningCompanyId === c.id || c.verification_status === 'verified'}
+                                    >
+                                      {ADMIN_COMPANIES_LABELS.verifyButton}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => {
+                                        setRejectTarget(c);
+                                        setRejectReason('');
+                                      }}
+                                      disabled={actioningCompanyId === c.id || c.verification_status === 'rejected'}
+                                    >
+                                      {ADMIN_COMPANIES_LABELS.rejectButton}
+                                    </Button>
                                   </div>
+                                </td>
+                              </motion.tr>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* TAB 2: RETURN REQUESTS */}
+            <TabsContent value="returns">
+              <FilterPills
+                filters={RETURN_FILTERS}
+                active={returnFilter}
+                onChange={(v) => {
+                  setReturnFilter(v);
+                  loadReturns(v);
+                }}
+              />
+
+              {returnsLoading ? (
+                <Skeleton className="h-56 w-full rounded-xl" />
+              ) : returns.length === 0 ? (
+                <EmptyPanel message={ADMIN_RETURNS_LABELS.noReturns} />
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[920px] text-left text-[13px]">
+                      <thead>
+                        <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableRef}</th>
+                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableOrder}</th>
+                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableCompany}</th>
+                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableProduct}</th>
+                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableReason}</th>
+                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableType}</th>
+                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableStatus}</th>
+                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableDate}</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <AnimatePresence initial={false}>
+                          {returns.map((r) => {
+                            const statusConfig = RETURN_STATUS_MAP[r.state] || { label: r.state, bg: '#f1f5f9', text: '#475569' };
+                            return (
+                              <motion.tr
+                                key={r.id}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40"
+                              >
+                                <td className="px-4 py-3 font-data font-medium text-ink-900">{r.name}</td>
+                                <td className="px-4 py-3 text-ink-600">{r.sale_order_name || '—'}</td>
+                                <td className="px-4 py-3 text-ink-500">{r.partner_name || '—'}</td>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-ink-900">{r.product_name}</div>
+                                  <div className="text-xs text-ink-400">Qty: {r.quantity}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="text-ink-600">{r.reason_category || '—'}</div>
+                                  {r.reason_detail && (
+                                    <div
+                                      className="max-w-[200px] truncate text-xs italic text-ink-400"
+                                      title={r.reason_detail}
+                                    >
+                                      {r.reason_detail}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 capitalize text-ink-600">{r.return_type}</td>
+                                <td className="px-4 py-3">
+                                  <StatusBadge config={statusConfig} />
+                                </td>
+                                <td className="px-4 py-3 text-ink-500">{new Date(r.request_date).toLocaleDateString()}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="brand"
+                                      onClick={() => handleApproveReturn(r.id)}
+                                      disabled={actioningReturnId === r.id || r.state !== 'requested'}
+                                    >
+                                      {ADMIN_RETURNS_LABELS.approveButton}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleRejectReturn(r.id)}
+                                      disabled={actioningReturnId === r.id || r.state !== 'requested'}
+                                    >
+                                      {ADMIN_RETURNS_LABELS.rejectButton}
+                                    </Button>
+                                  </div>
+                                </td>
+                              </motion.tr>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* TAB 3: ORDER TRACKING & SHIPPING */}
+            <TabsContent value="tracking">
+              {ordersLoading ? (
+                <Skeleton className="h-56 w-full rounded-xl" />
+              ) : orders.length === 0 ? (
+                <EmptyPanel message='No active confirmed orders found. Only orders in "Ordered/Confirmed" state can receive tracking.' />
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-left text-[13px]">
+                      <thead>
+                        <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                          <th className="px-4 py-3">Order Reference</th>
+                          <th className="px-4 py-3">Customer Company</th>
+                          <th className="px-4 py-3">Date Confirmed</th>
+                          <th className="px-4 py-3">Total Amount</th>
+                          <th className="px-4 py-3">Shipment Tracking</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orders.map((o) => {
+                          const trackingSet = !!o.tracking_reference;
+                          const ord: any = o;
+                          const carrierName = ord.carrier_id ? ord.carrier_id[1] : '';
+
+                          return (
+                            <tr key={o.id} className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40">
+                              <td className="px-4 py-3 font-data font-medium text-ink-900">{o.name}</td>
+                              <td className="px-4 py-3 text-ink-600">{Array.isArray(o.partner_id) ? o.partner_id[1] : '—'}</td>
+                              <td className="px-4 py-3 text-ink-500">{new Date(o.date_order).toLocaleDateString()}</td>
+                              <td className="px-4 py-3 font-medium text-ink-900">
+                                ${o.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-4 py-3">
+                                {trackingSet ? (
+                                  <div>
+                                    <span className="font-medium text-brand-700">{carrierName}</span>
+                                    <div className="text-xs text-ink-400">ID: {o.tracking_reference}</div>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs italic text-ink-400">Not yet shipped</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 capitalize text-ink-600">{r.return_type}</td>
-                              <td className="px-4 py-3">
-                                <StatusBadge config={statusConfig} />
+                              <td className="px-4 py-3 text-right">
+                                <Button size="sm" variant="outline" onClick={() => handleOpenTrackingSetup(o)}>
+                                  <Ship className="h-3.5 w-3.5" />
+                                  {trackingSet ? 'Update Tracking' : 'Ship Order'}
+                                </Button>
                               </td>
-                              <td className="px-4 py-3 text-ink-500">{new Date(r.request_date).toLocaleDateString()}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="brand"
-                                    onClick={() => handleApproveReturn(r.id)}
-                                    disabled={actioningReturnId === r.id || r.state !== 'requested'}
-                                  >
-                                    {ADMIN_RETURNS_LABELS.approveButton}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => handleRejectReturn(r.id)}
-                                    disabled={actioningReturnId === r.id || r.state !== 'requested'}
-                                  >
-                                    {ADMIN_RETURNS_LABELS.rejectButton}
-                                  </Button>
-                                </div>
-                              </td>
-                            </motion.tr>
+                            </tr>
                           );
                         })}
-                      </AnimatePresence>
-                    </tbody>
-                  </table>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* TAB 3: ORDER TRACKING & SHIPPING */}
-          <TabsContent value="tracking">
-            {ordersLoading ? (
-              <Skeleton className="h-56 w-full rounded-xl" />
-            ) : orders.length === 0 ? (
-              <EmptyPanel message='No active confirmed orders found. Only orders in "Ordered/Confirmed" state can receive tracking.' />
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-left text-[13px]">
-                    <thead>
-                      <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-                        <th className="px-4 py-3">Order Reference</th>
-                        <th className="px-4 py-3">Customer Company</th>
-                        <th className="px-4 py-3">Date Confirmed</th>
-                        <th className="px-4 py-3">Total Amount</th>
-                        <th className="px-4 py-3">Shipment Tracking</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orders.map((o) => {
-                        const trackingSet = !!o.tracking_reference;
-                        const ord: any = o;
-                        const carrierName = ord.carrier_id ? ord.carrier_id[1] : '';
-
-                        return (
-                          <tr key={o.id} className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40">
-                            <td className="px-4 py-3 font-data font-medium text-ink-900">{o.name}</td>
-                            <td className="px-4 py-3 text-ink-600">{Array.isArray(o.partner_id) ? o.partner_id[1] : '—'}</td>
-                            <td className="px-4 py-3 text-ink-500">{new Date(o.date_order).toLocaleDateString()}</td>
-                            <td className="px-4 py-3 font-medium text-ink-900">
-                              ${o.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </td>
-                            <td className="px-4 py-3">
-                              {trackingSet ? (
-                                <div>
-                                  <span className="font-medium text-brand-700">{carrierName}</span>
-                                  <div className="text-xs text-ink-400">ID: {o.tracking_reference}</div>
-                                </div>
-                              ) : (
-                                <span className="text-xs italic text-ink-400">Not yet shipped</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <Button size="sm" variant="outline" onClick={() => handleOpenTrackingSetup(o)}>
-                                <Ship className="h-3.5 w-3.5" />
-                                {trackingSet ? 'Update Tracking' : 'Ship Order'}
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </Container>
 
       {/* Company Rejection Modal */}

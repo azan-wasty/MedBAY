@@ -24,5 +24,17 @@
             <field name="value">[{"key":"ordered","label":"Order Placed"},{"key":"processing","label":"Confirmed \/ Processing"},{"key":"out_for_delivery","label":"Out for Delivery"},{"key":"delivered","label":"Delivered"},{"key":"completed","label":"Completed"},{"key":"return_requested","label":"Return Requested"},{"key":"cancelled","label":"Cancelled"}]</field>
         </record>
 
+        <!--
+            Whether a buyer's company must be admin-verified before they can
+            submit an RFQ. Set to "False" locally to test the RFQ email flow
+            without going through verification — flip back to "True" (or
+            leave unset; True is the default) for anything resembling
+            production.
+        -->
+        <record id="param_require_verification_for_rfq" model="ir.config_parameter">
+            <field name="key">medical_marketplace.require_verification_for_rfq</field>
+            <field name="value">True</field>
+        </record>
+
     </data>
 </odoo>
