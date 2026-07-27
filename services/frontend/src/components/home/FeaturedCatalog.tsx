@@ -4,41 +4,130 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, CheckCircle2, LayoutGrid } from "lucide-react";
 
-import { CATALOG_LABELS } from "@/lib/constants";
+import { CATALOG_LABELS, FILTER_LABELS, type SortOption } from "@/lib/constants";
 import type { Product } from "@/lib/odooClient";
-import { cn } from "@/lib/utils";
 import { Container } from "@/components/shared/Container";
 import { SectionHeading } from "@/components/shared/SectionHeading";
 import { ProductCard, ProductCardSkeleton } from "@/components/products/ProductCard";
+import { FilterSidebar, type FilterState } from "@/components/products/FilterSidebar";
+import { FilterDrawer } from "@/components/products/FilterDrawer";
+import { ActiveFilterChips, type ActiveChip } from "@/components/products/ActiveFilterChips";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getProductVendorName(product: Product): string {
+  if (Array.isArray(product.vendor_id) && product.vendor_id[1]) {
+    return product.vendor_id[1] as string;
+  }
+  return "";
+}
+
+function getProductCategory(product: Product): string {
+  if (Array.isArray(product.categ_id) && product.categ_id[1]) {
+    return product.categ_id[1] as string;
+  }
+  if (typeof product.categ_id === "string") return product.categ_id;
+  return "";
+}
+
+function sortProducts(products: Product[], sort: SortOption): Product[] {
+  const arr = [...products];
+  switch (sort) {
+    case "price_asc":
+      return arr.sort((a, b) => a.list_price - b.list_price);
+    case "price_desc":
+      return arr.sort((a, b) => b.list_price - a.list_price);
+    case "name_asc":
+      return arr.sort((a, b) => a.name.localeCompare(b.name));
+    case "name_desc":
+      return arr.sort((a, b) => b.name.localeCompare(a.name));
+    case "newest":
+      return arr.sort((a, b) => b.id - a.id);
+    default:
+      return arr;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Default filter state factory
+// ---------------------------------------------------------------------------
+
+const makeDefaultFilters = (priceMin: number, priceMax: number): FilterState => ({
+  category: "",
+  priceRange: [priceMin, priceMax],
+  vendors: [],
+  availability: [],
+  sort: "default",
+});
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 export default function FeaturedCatalog() {
   const [products, setProducts] = React.useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = React.useState<Product[]>([]);
-  const [categories, setCategories] = React.useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = React.useState<string>("");
-  const [searchTerm, setSearchTerm] = React.useState<string>("");
   const [loading, setLoading] = React.useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = React.useState<string>("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = React.useState<string>("");
   const [toastMessage, setToastMessage] = React.useState<string>("");
 
-  // Fetch products on mount — identical to the original implementation.
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 150);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Derived catalog metadata
+  const [categories, setCategories] = React.useState<string[]>([]);
+  const [vendors, setVendors] = React.useState<string[]>([]);
+  const [priceMin, setPriceMin] = React.useState<number>(0);
+  const [priceMax, setPriceMax] = React.useState<number>(10000);
+
+  // Filter state
+  const [filters, setFilters] = React.useState<FilterState>(
+    makeDefaultFilters(0, 10000)
+  );
+
+  // ── Fetch products ──────────────────────────────────────────────────────
   React.useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
         const res = await fetch("/api/products");
         if (!res.ok) throw new Error("Failed to load products");
-        const data = await res.json();
+        const data: Product[] = await res.json();
         setProducts(data);
 
+        // Derive filter metadata from the full product set
         const uniqueCategories = new Set<string>();
-        data.forEach((p: Product) => {
-          if (Array.isArray(p.categ_id) && p.categ_id[1]) {
-            uniqueCategories.add(p.categ_id[1]);
-          } else if (typeof p.categ_id === "string") {
-            uniqueCategories.add(p.categ_id);
+        const uniqueVendors = new Set<string>();
+        let lo = Infinity;
+        let hi = 0;
+
+        data.forEach((p) => {
+          const cat = getProductCategory(p);
+          if (cat) uniqueCategories.add(cat);
+
+          const vendor = getProductVendorName(p);
+          if (vendor) uniqueVendors.add(vendor);
+
+          if (p.list_price > 0) {
+            lo = Math.min(lo, p.list_price);
+            hi = Math.max(hi, p.list_price);
           }
         });
-        setCategories(Array.from(uniqueCategories));
+
+        const finalMin = lo === Infinity ? 0 : Math.floor(lo);
+        const finalMax = hi === 0 ? 10000 : Math.ceil(hi);
+
+        setCategories(Array.from(uniqueCategories).sort());
+        setVendors(Array.from(uniqueVendors).sort());
+        setPriceMin(finalMin);
+        setPriceMax(finalMax);
+        setFilters(makeDefaultFilters(finalMin, finalMax));
       } catch (err) {
         console.error("Error fetching catalog data:", err);
       } finally {
@@ -49,38 +138,150 @@ export default function FeaturedCatalog() {
     fetchProducts();
   }, []);
 
-  // Let the homepage's Categories showcase drive this section's filter.
+  // Allow homepage CategoriesGrid to pre-select a category
   React.useEffect(() => {
     const onSetCategory = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
-      if (typeof detail === "string") setSelectedCategory(detail);
+      if (typeof detail === "string") {
+        setFilters((prev) => ({ ...prev, category: detail }));
+      }
     };
     window.addEventListener("catalog:set-category", onSetCategory);
     return () => window.removeEventListener("catalog:set-category", onSetCategory);
   }, []);
 
-  // Filter products based on search term and selected category — identical to the original.
-  React.useEffect(() => {
+  // ── Filter + sort logic ─────────────────────────────────────────────────
+  const { displayProducts } = React.useMemo(() => {
     let result = products;
 
-    if (selectedCategory) {
-      result = result.filter((p) => {
-        const catName = Array.isArray(p.categ_id) ? p.categ_id[1] : p.categ_id;
-        return catName === selectedCategory;
-      });
-    }
-
-    if (searchTerm) {
-      const query = searchTerm.toLowerCase();
+    // Search
+    if (debouncedSearchTerm.trim()) {
+      const q = debouncedSearchTerm.toLowerCase();
       result = result.filter(
-        (p) => p.name.toLowerCase().includes(query) || (p.description_sale && p.description_sale.toLowerCase().includes(query))
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.description_sale && p.description_sale.toLowerCase().includes(q))
       );
     }
 
-    setFilteredProducts(result);
-  }, [products, selectedCategory, searchTerm]);
+    // Category
+    if (filters.category) {
+      result = result.filter((p) => getProductCategory(p) === filters.category);
+    }
 
-  // Add item to RFQ Cart — identical to the original.
+    // Price range
+    const [lo, hi] = filters.priceRange;
+    if (lo > priceMin || hi < priceMax) {
+      result = result.filter((p) => p.list_price >= lo && p.list_price <= hi);
+    }
+
+    // Vendors (OR within section)
+    if (filters.vendors.length > 0) {
+      result = result.filter((p) =>
+        filters.vendors.includes(getProductVendorName(p))
+      );
+    }
+
+    // Availability (OR within section)
+    if (filters.availability.length > 0) {
+      result = result.filter(
+        (p) => p.stock_status && filters.availability.includes(p.stock_status)
+      );
+    }
+
+    const sorted = sortProducts(result, filters.sort);
+    return { displayProducts: sorted };
+  }, [products, debouncedSearchTerm, filters, priceMin, priceMax]);
+
+  // ── Filter state helpers ────────────────────────────────────────────────
+  const updateFilter = React.useCallback(
+    <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
+      setFilters((prev) => ({ ...prev, [key]: value }));
+    },
+    [] // setFilters is stable, no deps needed
+  );
+
+  const clearAllFilters = React.useCallback(() => {
+    setFilters(makeDefaultFilters(priceMin, priceMax));
+    setSearchTerm("");
+  }, [priceMin, priceMax]);
+
+  // ── Active chip computation ─────────────────────────────────────────────
+  const activeChips = React.useMemo<ActiveChip[]>(() => {
+    const chips: ActiveChip[] = [];
+
+    if (filters.category) {
+      chips.push({
+        id: `cat-${filters.category}`,
+        label: filters.category,
+        onRemove: () => updateFilter("category", ""),
+      });
+    }
+
+    const [lo, hi] = filters.priceRange;
+    if (lo > priceMin || hi < priceMax) {
+      const fmt = (v: number) =>
+        v >= 1000000
+          ? `$${(v / 1000000).toFixed(1)}M`
+          : v >= 1000
+          ? `$${(v / 1000).toFixed(0)}k`
+          : `$${v}`;
+      chips.push({
+        id: "price-range",
+        label: `${fmt(lo)} – ${hi >= priceMax ? "Any" : fmt(hi)}`,
+        onRemove: () => updateFilter("priceRange", [priceMin, priceMax]),
+      });
+    }
+
+    filters.vendors.forEach((v) =>
+      chips.push({
+        id: `vendor-${v}`,
+        label: v,
+        onRemove: () =>
+          updateFilter(
+            "vendors",
+            filters.vendors.filter((x) => x !== v)
+          ),
+      })
+    );
+
+    filters.availability.forEach((a) => {
+      const label =
+        a === "in_stock"
+          ? FILTER_LABELS.stockInStock
+          : a === "low_stock"
+          ? FILTER_LABELS.stockLowStock
+          : FILTER_LABELS.stockOutOfStock;
+      chips.push({
+        id: `avail-${a}`,
+        label,
+        onRemove: () =>
+          updateFilter(
+            "availability",
+            filters.availability.filter((x) => x !== a)
+          ),
+      });
+    });
+
+    if (filters.sort !== "default") {
+      const sortLabel =
+        { price_asc: "Price: Low→High", price_desc: "Price: High→Low",
+          name_asc: "Name: A→Z", name_desc: "Name: Z→A", newest: "Newest" }[
+          filters.sort
+        ] ?? filters.sort;
+      chips.push({
+        id: `sort-${filters.sort}`,
+        label: `Sort: ${sortLabel}`,
+        onRemove: () => updateFilter("sort", "default"),
+      });
+    }
+
+    return chips;
+  }, [filters, priceMin, priceMax, updateFilter]);
+
+  const activeFilterCount = activeChips.length;
+
+  // ── Cart handler ────────────────────────────────────────────────────────
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
 
@@ -93,11 +294,7 @@ export default function FeaturedCatalog() {
     let cart: { id: number; name: string; quantity: number; price: number }[] = [];
 
     if (storedCart) {
-      try {
-        cart = JSON.parse(storedCart);
-      } catch {
-        cart = [];
-      }
+      try { cart = JSON.parse(storedCart); } catch { cart = []; }
     }
 
     const existingItem = cart.find((item) => item.id === product.id);
@@ -114,71 +311,114 @@ export default function FeaturedCatalog() {
 
     localStorage.setItem("med_cart", JSON.stringify(cart));
     window.dispatchEvent(new Event("cart-updated"));
-
     setToastMessage(`${product.name} ${CATALOG_LABELS.addedToCart}!`);
     setTimeout(() => setToastMessage(""), 3000);
   };
 
+  // ── Render ──────────────────────────────────────────────────────────────
   return (
     <section id="catalog" className="scroll-mt-20 bg-ink-50/40 py-20 sm:py-28">
       <Container>
         <SectionHeading
           eyebrow="Live Catalog"
           title="Featured equipment, sourced with confidence."
-          subtitle="Search and filter verified medical equipment from our supplier network — every listing shows real-time availability, compliance, and bulk pricing."
+          subtitle="Filter and search verified medical equipment from our supplier network — every listing shows real-time availability, compliance, and bulk pricing."
         />
 
-        <div className="mt-12 flex flex-col gap-8 lg:flex-row lg:items-start">
-          {/* Category filter — horizontal chips on mobile, sidebar on desktop */}
-          <aside className="lg:w-60 lg:shrink-0">
-            <h3 className="mb-3 hidden text-[11px] font-semibold uppercase tracking-wide text-ink-400 lg:block">
-              Categories
-            </h3>
-            <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 lg:pb-0">
-              <CategoryButton active={!selectedCategory} onClick={() => setSelectedCategory("")}>
-                {CATALOG_LABELS.filterAll}
-              </CategoryButton>
-              {categories.map((cat) => (
-                <CategoryButton key={cat} active={selectedCategory === cat} onClick={() => setSelectedCategory(cat)}>
-                  {cat}
-                </CategoryButton>
-              ))}
-            </div>
+        <div className="mt-12 flex flex-col gap-6 lg:flex-row lg:items-start">
+          {/* ── Desktop sidebar ── */}
+          <aside className="hidden lg:block lg:w-64 lg:shrink-0">
+            <FilterSidebar
+              filters={filters}
+              onChange={updateFilter}
+              onClearAll={clearAllFilters}
+              categories={categories}
+              vendors={vendors}
+              priceMin={priceMin}
+              priceMax={priceMax}
+            />
           </aside>
 
-          {/* Main catalog */}
+          {/* ── Main catalog area ── */}
           <div className="min-w-0 flex-1">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-              <input
-                type="text"
-                placeholder={CATALOG_LABELS.searchPlaceholder}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-12 w-full rounded-lg border border-ink-200 bg-white pl-11 pr-4 text-sm text-ink-900 shadow-soft-xs transition-colors placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/15"
+            {/* Search + mobile filter trigger row */}
+            <div className="flex items-center gap-3">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                <input
+                  type="text"
+                  placeholder={CATALOG_LABELS.searchPlaceholder}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-12 w-full rounded-lg border border-ink-200 bg-white pl-11 pr-4 text-sm text-ink-900 shadow-soft-xs transition-colors placeholder:text-ink-400 focus-visible:border-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/15"
+                />
+              </div>
+
+              {/* Mobile filter button — hidden on lg+ */}
+              <div className="lg:hidden">
+                <FilterDrawer
+                  filters={filters}
+                  onChange={updateFilter}
+                  onClearAll={clearAllFilters}
+                  categories={categories}
+                  vendors={vendors}
+                  priceMin={priceMin}
+                  priceMax={priceMax}
+                  activeFilterCount={activeFilterCount}
+                />
+              </div>
+            </div>
+
+            {/* Active filter chips + result count */}
+            <div className="mt-4">
+              <ActiveFilterChips
+                chips={activeChips}
+                onClearAll={clearAllFilters}
+                totalProducts={products.length}
+                filteredCount={displayProducts.length}
               />
             </div>
 
-            <div className="mt-6">
+            {/* Product grid */}
+            <div className="mt-5">
               {loading ? (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <ProductCardSkeleton key={i} />
                   ))}
                 </div>
-              ) : filteredProducts.length === 0 ? (
+              ) : displayProducts.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-ink-200 py-16 text-center"
+                  className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-ink-200 py-20 text-center"
                 >
                   <LayoutGrid className="h-8 w-8 text-ink-300" />
-                  <p className="text-sm text-ink-500">{CATALOG_LABELS.noProducts}</p>
+                  <div>
+                    <p className="text-sm font-medium text-ink-600">
+                      {CATALOG_LABELS.noProducts}
+                    </p>
+                    {activeChips.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearAllFilters}
+                        className="mt-2 text-[13px] font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
+                      >
+                        {FILTER_LABELS.clearAll}
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
               ) : (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                  {filteredProducts.map((product, i) => (
-                    <ProductCard key={product.id} product={product} index={i} onAddToCart={handleAddToCart} />
+                  {displayProducts.map((product, i) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      index={i}
+                      onAddToCart={handleAddToCart}
+                    />
                   ))}
                 </div>
               )}
@@ -187,7 +427,7 @@ export default function FeaturedCatalog() {
         </div>
       </Container>
 
-      {/* Toast notification */}
+      {/* Toast */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
@@ -204,36 +444,5 @@ export default function FeaturedCatalog() {
         )}
       </AnimatePresence>
     </section>
-  );
-}
-
-function CategoryButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "relative shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2.5 text-left text-[13.5px] font-medium transition-colors lg:w-full",
-        active ? "bg-brand-50 text-brand-700" : "text-ink-600 hover:bg-ink-100/70 hover:text-ink-900"
-      )}
-    >
-      {active && (
-        <motion.span
-          layoutId="activeCategoryBg"
-          className="absolute inset-0 rounded-lg border-l-2 border-brand-600 bg-brand-50 lg:border-l-[3px]"
-          style={{ zIndex: -1 }}
-          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-        />
-      )}
-      {children}
-    </button>
   );
 }

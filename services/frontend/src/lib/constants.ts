@@ -389,6 +389,49 @@ export const FAQ_ITEMS = [
   },
 ];
 
+export const FILTER_LABELS = {
+  // Sidebar
+  sidebarTitle: "Filters",
+  clearAll: "Clear all",
+  apply: "Apply Filters",
+  showFilters: "Filters",
+  hideFilters: "Hide Filters",
+  resultCount: (shown: number, total: number) =>
+    shown === total ? `${total} products` : `Showing ${shown} of ${total} products`,
+
+  // Section headings
+  categorySection: "Category",
+  priceSection: "Price Range",
+  vendorSection: "Brand / Supplier",
+  availabilitySection: "Availability",
+  sortSection: "Sort By",
+
+  // Price
+  minPrice: "Min",
+  maxPrice: "Max",
+  priceAny: "Any",
+
+  // Availability options (must match stock_status values in Odoo)
+  stockInStock: "In Stock",
+  stockLowStock: "Low Stock",
+  stockOutOfStock: "Out of Stock",
+
+  // Active chips
+  activeFiltersLabel: "Active filters:",
+  removeFilter: "Remove filter",
+};
+
+export const SORT_OPTIONS = [
+  { value: "default", label: "Default" },
+  { value: "price_asc", label: "Price: Low → High" },
+  { value: "price_desc", label: "Price: High → Low" },
+  { value: "name_asc", label: "Name: A → Z" },
+  { value: "name_desc", label: "Name: Z → A" },
+  { value: "newest", label: "Newest First" },
+] as const;
+
+export type SortOption = (typeof SORT_OPTIONS)[number]["value"];
+
 // High-quality mock catalog data used as a fallback if Odoo has no records.
 // Shaped to match the current Product/AttributeLine/ProductVariant types in
 // odooClient.ts. Mock attribute/value ids use a 9000+ range so they can
@@ -409,7 +452,9 @@ export const MOCK_PRODUCTS = [
     vendor_id: [9101, "Aura Medical Systems"] as [number, string],
     stock_status: "in_stock" as const,
     low_stock_threshold: 2,
-    qty_available: 4,
+    marketplace_published: true,
+    marketplace_featured: true,
+    featured_sequence: 1,
     attribute_line_ids: [] as number[],
   },
   {
@@ -428,6 +473,9 @@ export const MOCK_PRODUCTS = [
     stock_status: "low_stock" as const,
     low_stock_threshold: 5,
     qty_available: 3,
+    marketplace_published: true,
+    marketplace_featured: true,
+    featured_sequence: 2,
     attribute_line_ids: [] as number[],
   },
   {

@@ -3,13 +3,14 @@ import json
 import logging
 import os
 
-from odoo import fields, http  # type: ignore
+from odoo import SUPERUSER_ID, fields, http  # type: ignore
 from odoo.http import request  # type: ignore
 
 _logger = logging.getLogger(__name__)
 
 ODOO_DB_NAME = os.environ.get('ODOO_DB_NAME', 'odoo')
 ADMIN_GROUP_XMLID = 'medical_marketplace.group_marketplace_admin'
+FEATURED_MAX = 8
 
 # Comma-separated list of origins allowed to make credentialed cross-origin
 # requests to the /api/* endpoints, e.g. "http://localhost:3000,https://medbay.example.com".
@@ -36,7 +37,7 @@ class MedicalMarketplaceController(http.Controller):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _json_response(self, data, status=200):
+    def _json_response(self, data, status=200, cache_control=None):
         def _decode_bytes(val):
             if isinstance(val, dict):
                 return {k: _decode_bytes(v) for k, v in val.items()}
@@ -55,6 +56,8 @@ class MedicalMarketplaceController(http.Controller):
         if origin:
             headers.append(('Access-Control-Allow-Origin', origin))
             headers.append(('Access-Control-Allow-Credentials', 'true'))
+        if cache_control:
+            headers.append(('Cache-Control', cache_control))
         return request.make_response(
             json.dumps(_decode_bytes(data), default=str),
             headers=headers,
@@ -180,18 +183,76 @@ class MedicalMarketplaceController(http.Controller):
     def list_products(self, **kwargs):
         # Feature 4: only marketplace_published products are visible to buyers
         domain = [('sale_ok', '=', True), ('marketplace_published', '=', True)]
+
+        # ── Text search ──────────────────────────────────────────────────
         search_term = kwargs.get('search')
         if search_term:
             domain.append(('name', 'ilike', search_term))
+
+        # ── Category filter ──────────────────────────────────────────────
+        category = kwargs.get('category')
+        if category:
+            domain.append(('categ_id.name', '=', category))
+
+        # ── Price range ──────────────────────────────────────────────────
+        min_price = kwargs.get('min_price')
+        max_price = kwargs.get('max_price')
+        if min_price:
+            try:
+                domain.append(('list_price', '>=', float(min_price)))
+            except (ValueError, TypeError):
+                pass
+        if max_price:
+            try:
+                domain.append(('list_price', '<=', float(max_price)))
+            except (ValueError, TypeError):
+                pass
+
+        # ── Stock status (comma-separated, OR within) ────────────────────
+        stock_status_param = kwargs.get('stock_status', '')
+        if stock_status_param:
+            statuses = [s.strip() for s in stock_status_param.split(',') if s.strip()]
+            if statuses:
+                domain.append(('stock_status', 'in', statuses))
+
+        # ── Vendor IDs (comma-separated, OR within) ──────────────────────
+        vendor_ids_param = kwargs.get('vendor_ids', '')
+        if vendor_ids_param:
+            try:
+                vendor_ids = [int(v.strip()) for v in vendor_ids_param.split(',') if v.strip()]
+                if vendor_ids:
+                    domain.append(('vendor_id', 'in', vendor_ids))
+            except (ValueError, TypeError):
+                pass
 
         products = request.env['product.template'].sudo().search_read(
             domain,
             ['id', 'name', 'list_price', 'description_sale', 'categ_id',
              'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period',
              'image_256', 'has_vendor_company', 'vendor_id', 'stock_status', 'low_stock_threshold',
-             'attribute_line_ids', 'marketplace_published']
+             'attribute_line_ids', 'marketplace_published', 'marketplace_featured', 'featured_sequence']
         )
-        return self._json_response(products)
+        return self._json_response(products, cache_control='public, max-age=60, stale-while-revalidate=300')
+
+    @http.route('/api/products/featured', type='http', auth='public', methods=['GET'], csrf=False)
+    def list_featured_products(self, **kwargs):
+        domain = [
+            ('sale_ok', '=', True),
+            ('marketplace_published', '=', True),
+            ('marketplace_featured', '=', True),
+        ]
+        products = request.env['product.template'].sudo().search_read(
+            domain,
+            ['id', 'name', 'list_price', 'description_sale', 'categ_id',
+             'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period',
+             'image_256', 'image_1920', 'has_vendor_company', 'vendor_id', 'stock_status',
+             'low_stock_threshold', 'attribute_line_ids', 'marketplace_published',
+             'marketplace_featured', 'featured_sequence'],
+            order='featured_sequence asc, name asc',
+            limit=FEATURED_MAX,
+        )
+        return self._json_response(products, cache_control='public, max-age=60, stale-while-revalidate=300')
+
 
     @http.route('/api/products/<int:product_id>', type='http', auth='public', methods=['GET'], csrf=False)
     def product_detail(self, product_id, **kwargs):
@@ -300,9 +361,13 @@ class MedicalMarketplaceController(http.Controller):
     # Auth
     # ------------------------------------------------------------------
 
-    @http.route('/api/auth/register', type='http', auth='public', methods=['POST'], csrf=False)
+    @http.route('/api/auth/register', type='http', auth='none', methods=['POST'], csrf=False)
     def register(self, **kwargs):
         try:
+            if not request.session.db:
+                request.session.db = ODOO_DB_NAME
+            request.update_env(user=SUPERUSER_ID)
+
             body = json.loads(request.httprequest.data)
             name = body.get('name')
             registration_number = body.get('registration_number')

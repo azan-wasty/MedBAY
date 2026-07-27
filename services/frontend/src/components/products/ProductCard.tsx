@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export function ProductCard({
+export const ProductCard = React.memo(function ProductCard({
   product,
   index = 0,
   onAddToCart,
@@ -52,6 +52,8 @@ export function ProductCard({
             src={imageSrc}
             alt={product.name}
             loading="lazy"
+            decoding="async"
+            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
             className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
           />
         ) : (
@@ -141,7 +143,7 @@ export function ProductCard({
       </div>
     </motion.div>
   );
-}
+});
 
 export function ProductCardSkeleton() {
   return (

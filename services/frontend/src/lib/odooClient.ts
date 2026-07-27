@@ -71,6 +71,8 @@ export interface Product {
   low_stock_threshold?: number;
   qty_available?: number;
   marketplace_published?: boolean;
+  marketplace_featured?: boolean;
+  featured_sequence?: number;
   attribute_line_ids?: number[];
   attribute_lines?: AttributeLine[];
   variants?: ProductVariant[];
@@ -300,6 +302,13 @@ export const odooClient = {
   async getProducts(search?: string): Promise<Product[]> {
     const query = search ? `?search=${encodeURIComponent(search)}` : '';
     return this.request<Product[]>(`/api/products${query}`, {
+      method: 'GET',
+      next: { revalidate: 10 },
+    });
+  },
+
+  async getFeaturedProducts(): Promise<Product[]> {
+    return this.request<Product[]>('/api/products/featured', {
       method: 'GET',
       next: { revalidate: 10 },
     });

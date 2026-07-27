@@ -51,6 +51,22 @@ class ProductTemplate(models.Model):
              'without deleting it or affecting stock.',
     )
 
+    marketplace_featured = fields.Boolean(
+        string='Featured on Homepage',
+        default=False,
+        index=True,
+        help='Tick to display this product in the hero carousel on the homepage. '
+             'Only products that are also Published on Marketplace will appear, '
+             'regardless of this flag.',
+    )
+
+    featured_sequence = fields.Integer(
+        string='Featured Display Order',
+        default=10,
+        help='Controls the position of this product in the hero carousel. '
+             'Lower numbers appear first. Products with equal sequences are sorted A→Z by name.',
+    )
+
     # ------------------------------------------------------------------
     # Stock status (existing — do not change field names)
     # ------------------------------------------------------------------

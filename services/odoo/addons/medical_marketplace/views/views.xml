@@ -30,6 +30,11 @@
                 </group>
                 <group string="Marketplace">
                     <field name="marketplace_published" widget="boolean_toggle"/>
+                    <field name="marketplace_featured" widget="boolean_toggle"/>
+                    <field name="featured_sequence"
+                           invisible="not marketplace_featured"
+                           string="Featured Display Order"
+                           help="Lower number = displayed earlier in the hero carousel. Default: 10"/>
                 </group>
             </xpath>
         </field>
