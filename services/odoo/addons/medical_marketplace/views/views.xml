@@ -40,6 +40,24 @@
         </field>
     </record>
 
+    <!-- Sale order line: show buyer's proposed target price (bid) -->
+    <record id="view_sale_order_form_medical_target_price" model="ir.ui.view">
+        <field name="name">sale.order.form.medical.target_price</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <!-- Insert "Buyer Target Price" column right after the unit price column -->
+            <xpath expr="//field[@name='order_line']//tree//field[@name='price_unit']" position="after">
+                <field name="target_price_unit"
+                       string="Buyer Target Price"
+                       optional="show"
+                       widget="monetary"
+                       attrs="{'invisible': [('target_price_unit', '=', 0)]}"
+                       help="The unit price the buyer proposed when submitting the RFQ. 0 means no target was specified."/>
+            </xpath>
+        </field>
+    </record>
+
     <!-- Partner form: verification fields -->
     <record id="view_partner_form_medical" model="ir.ui.view">
         <field name="name">res.partner.form.medical</field>

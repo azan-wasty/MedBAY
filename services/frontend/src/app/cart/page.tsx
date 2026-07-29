@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
@@ -28,6 +29,7 @@ const alertVariants: Variants = {
 };
 
 export default function CartPage() {
+  const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -91,7 +93,8 @@ export default function CartPage() {
 
   const handleSubmitRFQ = async () => {
     if (!isLoggedIn) {
-      setErrorMsg(AUTH_LABELS.unauthorizedMsg);
+      // Redirect to login instead of showing an error — preserves cart in localStorage
+      router.push('/login');
       return;
     }
 
@@ -232,10 +235,11 @@ export default function CartPage() {
               </div>
 
               {/* Column headers */}
-              <div className="hidden grid-cols-[1fr_auto_140px_36px] items-center gap-3 border-b border-ink-100 bg-ink-50/60 px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400 sm:grid">
+              <div className="hidden grid-cols-[1fr_auto_120px_140px_36px] items-center gap-3 border-b border-ink-100 bg-ink-50/60 px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400 sm:grid">
                 <span>Product</span>
                 <span className="text-center">Qty</span>
-                <span className="text-center">Your Target Price / unit</span>
+                <span className="text-right">List Price</span>
+                <span className="text-center">Your Target Price</span>
                 <span />
               </div>
 
@@ -249,7 +253,7 @@ export default function CartPage() {
                       exit={{ opacity: 0, x: 12, height: 0, transition: { duration: 0.2 } }}
                       transition={{ duration: 0.25 }}
                       layout
-                      className="flex flex-col gap-3 border-b border-ink-100 px-5 py-4 last:border-b-0 sm:grid sm:grid-cols-[1fr_auto_140px_36px] sm:items-center sm:gap-3"
+                      className="flex flex-col gap-3 border-b border-ink-100 px-5 py-4 last:border-b-0 sm:grid sm:grid-cols-[1fr_auto_120px_140px_36px] sm:items-center sm:gap-3"
                     >
                       {/* Name */}
                       <div className="min-w-0">
@@ -260,6 +264,14 @@ export default function CartPage() {
                           {item.name}
                         </Link>
                         {item.variantLabel && <p className="mt-0.5 text-xs text-ink-500">{item.variantLabel}</p>}
+                      </div>
+
+                      {/* List price */}
+                      <div className="text-right">
+                        <span className="font-data text-[13px] font-semibold text-ink-700">
+                          ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                        <p className="text-[10px] text-ink-400">per unit</p>
                       </div>
 
                       {/* Qty stepper */}
@@ -328,6 +340,12 @@ export default function CartPage() {
                 <div className="flex items-center justify-between text-[13px]">
                   <span className="text-ink-500">Total Items</span>
                   <strong className="font-medium text-ink-900">{totalItems}</strong>
+                </div>
+                <div className="flex items-center justify-between border-t border-ink-100 pt-2 text-[13px]">
+                  <span className="text-ink-500">Est. List Value</span>
+                  <strong className="font-data font-semibold text-ink-900">
+                    ${cartItems.reduce((acc, i) => acc + i.price * i.quantity, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </strong>
                 </div>
               </div>
 

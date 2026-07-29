@@ -434,11 +434,14 @@ export type SortOption = (typeof SORT_OPTIONS)[number]["value"];
 
 // High-quality mock catalog data used as a fallback if Odoo has no records.
 // Shaped to match the current Product/AttributeLine/ProductVariant types in
-// odooClient.ts. Mock attribute/value ids use a 9000+ range so they can
-// never collide with real Odoo-assigned ids.
+// odooClient.ts. Mock attribute/value ids use a 9000+ range, and mock
+// product ids use a 900000+ range, so neither can ever collide with
+// real Odoo-assigned ids (which start at 1). This makes it safe to blend
+// mock products alongside live Odoo results (e.g. the homepage featured
+// rail) instead of only using one source or the other.
 export const MOCK_PRODUCTS = [
   {
-    id: 1,
+    id: 900001,
     name: "AuraScan MRI Machine - 3T",
     list_price: 1250000.0,
     description_sale: "State-of-the-art 3 Tesla MRI scanner offering high-resolution clinical imaging with advanced noise-canceling technology.",
@@ -458,7 +461,7 @@ export const MOCK_PRODUCTS = [
     attribute_line_ids: [] as number[],
   },
   {
-    id: 2,
+    id: 900002,
     name: "Medisurge ICU Ventilator - V2",
     list_price: 45000.0,
     description_sale: "Critical care ventilator suitable for pediatric and adult patients. Supports invasive and non-invasive ventilation modes.",
@@ -479,7 +482,7 @@ export const MOCK_PRODUCTS = [
     attribute_line_ids: [] as number[],
   },
   {
-    id: 3,
+    id: 900003,
     name: "SurgiPath Surgical Lighting System",
     list_price: 12500.0,
     description_sale: "High-intensity LED surgical light head with customizable light diameter and color temperature adjustments.",
@@ -497,7 +500,7 @@ export const MOCK_PRODUCTS = [
     attribute_line_ids: [] as number[],
   },
   {
-    id: 4,
+    id: 900004,
     name: "HeartSync Defibrillator - Pro",
     list_price: 7800.0,
     description_sale: "Biphasic automated external defibrillator (AED) and manual monitor with pacing, SpO2, and ECG display.",
@@ -515,7 +518,7 @@ export const MOCK_PRODUCTS = [
     attribute_line_ids: [] as number[],
   },
   {
-    id: 5,
+    id: 900005,
     name: "SterilMax Autoclave Sterilizer",
     list_price: 18500.0,
     description_sale: "Class B steam sterilizer with vacuum pump and built-in micro-printer for sterilization cycles logging.",
@@ -537,7 +540,7 @@ export const MOCK_PRODUCTS = [
   // fallback path can exercise the variant-selection UI too, not just the
   // live Odoo path.
   {
-    id: 6,
+    id: 900006,
     name: "MedGuard Nitrile Examination Gloves",
     list_price: 18.5,
     description_sale: "Powder-free nitrile examination gloves with textured fingertips for superior grip. Latex-free, suitable for sensitive-skin use.",
@@ -587,7 +590,7 @@ export const MOCK_PRODUCTS = [
     ],
   },
   {
-    id: 7,
+    id: 900007,
     name: "ProCare Surgical Face Masks",
     list_price: 15.99,
     description_sale: "ASTM Level 3 surgical face masks with adjustable nose bridge and triple-layer filtration for high fluid-resistance environments.",
@@ -642,6 +645,56 @@ export const MOCK_PRODUCTS = [
     ],
   },
 ];
+
+// Bulk-pricing tiers for mock products, keyed by mock product id (900000+
+// range — see MOCK_PRODUCTS above). Mirrors the shape the live Odoo
+// /api/products/<id>/pricing endpoint derives from product.pricelist.item
+// records: a quantity threshold plus a discount percentage off list_price.
+// Only the tier shape is stored here — the actual price at each tier is
+// computed from the product's own list_price at request time (see
+// app/api/products/[id]/pricing/route.ts), so there's a single source of
+// truth and the two numbers can't drift out of sync.
+export const MOCK_PRICING_TIERS: Record<
+  number,
+  { min_qty: number; discount_pct: number }[]
+> = {
+  900001: [
+    { min_qty: 1, discount_pct: 0 },
+    { min_qty: 3, discount_pct: 5 },
+    { min_qty: 5, discount_pct: 10 },
+  ],
+  900002: [
+    { min_qty: 2, discount_pct: 0 },
+    { min_qty: 5, discount_pct: 6 },
+    { min_qty: 10, discount_pct: 12 },
+  ],
+  900003: [
+    { min_qty: 1, discount_pct: 0 },
+    { min_qty: 5, discount_pct: 8 },
+    { min_qty: 10, discount_pct: 15 },
+  ],
+  900004: [
+    { min_qty: 5, discount_pct: 0 },
+    { min_qty: 10, discount_pct: 7 },
+    { min_qty: 25, discount_pct: 15 },
+  ],
+  900005: [
+    { min_qty: 1, discount_pct: 0 },
+    { min_qty: 3, discount_pct: 5 },
+    { min_qty: 6, discount_pct: 10 },
+  ],
+  900006: [
+    { min_qty: 10, discount_pct: 0 },
+    { min_qty: 50, discount_pct: 10 },
+    { min_qty: 200, discount_pct: 20 },
+  ],
+  900007: [
+    { min_qty: 5, discount_pct: 0 },
+    { min_qty: 25, discount_pct: 12 },
+    { min_qty: 100, discount_pct: 22 },
+  ],
+};
+
 // Supplier showcase for the homepage "Trusted Suppliers" section — derived
 // directly from the vendors already present in MOCK_PRODUCTS rather than
 // invented separately, so it never drifts from the real catalog data.

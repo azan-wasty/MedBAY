@@ -303,12 +303,6 @@ export default function DashboardPage() {
                 </span>
                 <strong className="break-all font-medium text-ink-900">{user?.email}</strong>
               </div>
-              <div>
-                <span className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wide text-ink-400">
-                  Account ID
-                </span>
-                <strong className="font-data font-medium text-ink-900">PARTNER#{user?.partner_id}</strong>
-              </div>
             </div>
           </div>
 
