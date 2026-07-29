@@ -587,6 +587,28 @@ export const odooClient = {
     });
   },
 
+  async adminTopProducts(sessionId: string, limit = 5): Promise<AdminTopProduct[]> {
+    return this.request<AdminTopProduct[]>(`/api/admin/products/top?limit=${limit}`, {
+      method: 'GET',
+      headers: { Cookie: `session_id=${sessionId}` },
+      cache: 'no-store',
+    });
+  },
+
+  // --- Admin: RFQs / Quotations ---
+
+  async adminListRfqs(sessionId: string, state?: string, limit?: number): Promise<AdminOrder[]> {
+    const params = new URLSearchParams();
+    if (state) params.set('state', state);
+    if (limit) params.set('limit', String(limit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request<AdminOrder[]>(`/api/admin/rfq${query}`, {
+      method: 'GET',
+      headers: { Cookie: `session_id=${sessionId}` },
+      cache: 'no-store',
+    });
+  },
+
   // --- Admin: Order Tracking ---
 
   async adminSetOrderTracking(orderId: number, carrierId: number, trackingReference: string, sessionId: string) {
@@ -612,4 +634,15 @@ export interface AdminOrder extends RFQItem {
   partner_id: [number, string] | boolean;
   carrier_id?: [number, string] | boolean;
   tracking_reference?: string | boolean;
+  requested_total?: number;
+}
+
+// Best-selling product row, as returned by GET /api/admin/products/top
+// for the admin dashboard's Top Products table.
+export interface AdminTopProduct {
+  product_id: number;
+  product_name: string;
+  quantity_sold: number;
+  revenue: number;
+  order_count: number;
 }

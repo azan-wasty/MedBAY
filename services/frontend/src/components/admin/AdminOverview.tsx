@@ -2,35 +2,30 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Building2, ShieldCheck, RotateCcw, Truck, ArrowUpRight } from 'lucide-react';
 
 import { ADMIN_OVERVIEW_LABELS } from '@/lib/constants';
-import type { CompanyPartner, AdminReturnRequest, AdminOrder } from '@/lib/odooClient';
-import { cn } from '@/lib/utils';
+import type { CompanyPartner, AdminReturnRequest, AdminOrder, AdminTopProduct } from '@/lib/odooClient';
+import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type TabValue = 'companies' | 'returns' | 'tracking';
 
-const COLORS = {
-    amber: '#F59E0B',
-    emerald: '#059669',
-    red: '#EF4444',
-    slate: '#94A3B8',
-    brand: '#0F7A6C',
-    azure: '#1D5FA6',
+const QUOTATION_STATE_STYLES: Record<string, string> = {
+    draft: 'bg-ink-50 text-ink-500',
+    sent: 'bg-amber-50 text-amber-800',
+    sale: 'bg-emerald-50 text-emerald-700',
+    done: 'bg-emerald-50 text-emerald-700',
+    cancel: 'bg-red-50 text-red-700',
 };
 
-function ChartTooltip({ active, payload }: any) {
-    if (!active || !payload?.length) return null;
-    const item = payload[0];
-    return (
-        <div className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-[12.5px] shadow-soft-lg">
-            <span className="font-medium text-ink-900">{item.name}</span>
-            <span className="ml-2 font-data font-semibold text-ink-600">{item.value}</span>
-        </div>
-    );
-}
+const QUOTATION_STATE_LABELS: Record<string, string> = {
+    draft: 'Draft',
+    sent: 'Quoted',
+    sale: 'Confirmed',
+    done: 'Done',
+    cancel: 'Cancelled',
+};
 
 function KpiCard({
     icon: Icon,
@@ -77,20 +72,22 @@ function KpiCard({
     );
 }
 
-function ChartCard({
+function PanelCard({
     title,
     onExplore,
+    exploreLabel,
     empty,
     children,
 }: {
     title: string;
     onExplore?: () => void;
+    exploreLabel?: string;
     empty?: boolean;
     children: React.ReactNode;
 }) {
     return (
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-soft-xs">
-            <div className="mb-1 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-[13px] font-semibold text-ink-900">{title}</h3>
                 {onExplore && !empty && (
                     <button
@@ -98,17 +95,17 @@ function ChartCard({
                         onClick={onExplore}
                         className="flex items-center gap-0.5 text-[11px] font-medium text-ink-400 transition-colors hover:text-brand-700"
                     >
-                        {ADMIN_OVERVIEW_LABELS.clickToFilter}
+                        {exploreLabel || ADMIN_OVERVIEW_LABELS.viewAll}
                         <ArrowUpRight className="h-3 w-3" />
                     </button>
                 )}
             </div>
-            <div className="h-[180px]">{children}</div>
+            <div className={empty ? 'h-[160px]' : ''}>{children}</div>
         </div>
     );
 }
 
-function EmptyChart({ message }: { message: string }) {
+function EmptyState({ message }: { message: string }) {
     return <div className="flex h-full items-center justify-center text-[12.5px] text-ink-400">{message}</div>;
 }
 
@@ -122,6 +119,8 @@ export function AdminOverview({
     const [companies, setCompanies] = useState<CompanyPartner[]>([]);
     const [returns, setReturns] = useState<AdminReturnRequest[]>([]);
     const [orders, setOrders] = useState<AdminOrder[]>([]);
+    const [quotations, setQuotations] = useState<AdminOrder[]>([]);
+    const [topProducts, setTopProducts] = useState<AdminTopProduct[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -129,20 +128,26 @@ export function AdminOverview({
         const loadAll = async () => {
             try {
                 setLoading(true);
-                const [companiesRes, returnsRes, ordersRes] = await Promise.all([
+                const [companiesRes, returnsRes, ordersRes, quotationsRes, topProductsRes] = await Promise.all([
                     fetch('/api/admin/companies'),
                     fetch('/api/admin/returns'),
                     fetch('/api/rfq?state=sale'),
+                    fetch('/api/admin/rfq?limit=5'),
+                    fetch('/api/admin/products/top?limit=5'),
                 ]);
-                const [companiesData, returnsData, ordersData] = await Promise.all([
+                const [companiesData, returnsData, ordersData, quotationsData, topProductsData] = await Promise.all([
                     companiesRes.json(),
                     returnsRes.json(),
                     ordersRes.json(),
+                    quotationsRes.json(),
+                    topProductsRes.json(),
                 ]);
                 if (cancelled) return;
                 setCompanies(Array.isArray(companiesData) ? companiesData : []);
                 setReturns(Array.isArray(returnsData?.returns) ? returnsData.returns : []);
                 setOrders(Array.isArray(ordersData) ? ordersData.filter((o: any) => o.state === 'sale') : []);
+                setQuotations(Array.isArray(quotationsData) ? quotationsData : []);
+                setTopProducts(Array.isArray(topProductsData) ? topProductsData : []);
             } catch (err) {
                 console.error('Error loading admin overview:', err);
             } finally {
@@ -168,20 +173,7 @@ export function AdminOverview({
         const active = returns.filter((r) => r.state === 'requested').length;
         const approved = returns.filter((r) => r.state === 'approved' || r.state === 'refunded' || r.state === 'replaced').length;
         const rejected = returns.filter((r) => r.state === 'rejected').length;
-        const refund = returns.filter((r) => r.return_type === 'refund').length;
-        const replacement = returns.filter((r) => r.return_type === 'replacement').length;
-
-        const reasonCounts = new Map<string, number>();
-        returns.forEach((r) => {
-            const key = r.reason_category || 'Uncategorized';
-            reasonCounts.set(key, (reasonCounts.get(key) || 0) + 1);
-        });
-        const byReason = Array.from(reasonCounts.entries())
-            .map(([reason, count]) => ({ reason, count }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 6);
-
-        return { total, active, approved, rejected, refund, replacement, byReason };
+        return { total, active, approved, rejected };
     }, [returns]);
 
     const orderStats = useMemo(() => {
@@ -192,25 +184,6 @@ export function AdminOverview({
         return { total, shipped, awaiting, totalValue };
     }, [orders]);
 
-    const verificationData = useMemo(
-        () =>
-            [
-                { name: 'Verified', value: companyStats.verified, color: COLORS.emerald, filter: 'verified' },
-                { name: 'Pending', value: companyStats.pending, color: COLORS.amber, filter: 'pending' },
-                { name: 'Rejected', value: companyStats.rejected, color: COLORS.red, filter: 'rejected' },
-            ].filter((d) => d.value > 0),
-        [companyStats]
-    );
-
-    const resolutionData = useMemo(
-        () =>
-            [
-                { name: 'Refund', value: returnStats.refund, color: COLORS.brand },
-                { name: 'Replacement', value: returnStats.replacement, color: COLORS.azure },
-            ].filter((d) => d.value > 0),
-        [returnStats]
-    );
-
     if (loading) {
         return (
             <div className="mb-8">
@@ -219,8 +192,8 @@ export function AdminOverview({
                         <Skeleton key={i} className="h-[110px] rounded-xl" />
                     ))}
                 </div>
-                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                    {[1, 2, 3].map((i) => (
+                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {[1, 2].map((i) => (
                         <Skeleton key={i} className="h-[240px] rounded-xl" />
                     ))}
                 </div>
@@ -283,92 +256,74 @@ export function AdminOverview({
                 </button>
             </div>
 
-            {/* Charts */}
-            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <ChartCard
-                    title={ADMIN_OVERVIEW_LABELS.verificationChartTitle}
-                    onExplore={() => onNavigate('companies')}
-                    empty={verificationData.length === 0}
-                >
-                    {verificationData.length === 0 ? (
-                        <EmptyChart message={ADMIN_OVERVIEW_LABELS.noCompanyData} />
+            {/* Actionable tables */}
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <PanelCard title={ADMIN_OVERVIEW_LABELS.latestQuotationsTitle} empty={quotations.length === 0}>
+                    {quotations.length === 0 ? (
+                        <EmptyState message={ADMIN_OVERVIEW_LABELS.noQuotationData} />
                     ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={verificationData}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    innerRadius={45}
-                                    outerRadius={70}
-                                    paddingAngle={3}
-                                    strokeWidth={0}
-                                    onClick={(d: any) => onNavigate('companies', d.filter)}
-                                    className="cursor-pointer outline-none"
-                                >
-                                    {verificationData.map((entry) => (
-                                        <Cell key={entry.name} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip content={<ChartTooltip />} />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        <table className="w-full text-left text-[12.5px]">
+                            <thead>
+                                <tr className="text-[11px] uppercase tracking-wide text-ink-400">
+                                    <th className="pb-2 font-medium">{ADMIN_OVERVIEW_LABELS.quotationCompanyHeader}</th>
+                                    <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.quotationAmountHeader}</th>
+                                    <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.quotationRequestedHeader}</th>
+                                    <th className="pb-2 font-medium">{ADMIN_OVERVIEW_LABELS.quotationStatusHeader}</th>
+                                    <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.quotationDateHeader}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {quotations.map((q) => (
+                                    <tr key={q.id} className="border-t border-ink-50">
+                                        <td className="py-2.5 font-medium text-ink-900">
+                                            {Array.isArray(q.partner_id) ? q.partner_id[1] : '—'}
+                                        </td>
+                                        <td className="py-2.5 text-right font-data text-ink-900">{formatCurrency(q.amount_total)}</td>
+                                        <td className="py-2.5 text-right font-data text-ink-500">
+                                            {q.requested_total ? formatCurrency(q.requested_total) : '—'}
+                                        </td>
+                                        <td className="py-2.5">
+                                            <span
+                                                className={cn(
+                                                    'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                                    QUOTATION_STATE_STYLES[q.state] || 'bg-ink-50 text-ink-500'
+                                                )}
+                                            >
+                                                {QUOTATION_STATE_LABELS[q.state] || q.state}
+                                            </span>
+                                        </td>
+                                        <td className="py-2.5 text-right text-ink-500">{formatDate(q.date_order)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     )}
-                </ChartCard>
+                </PanelCard>
 
-                <ChartCard title={ADMIN_OVERVIEW_LABELS.reasonChartTitle} empty={returnStats.byReason.length === 0}>
-                    {returnStats.byReason.length === 0 ? (
-                        <EmptyChart message={ADMIN_OVERVIEW_LABELS.noReturnData} />
+                <PanelCard title={ADMIN_OVERVIEW_LABELS.topProductsTitle} empty={topProducts.length === 0}>
+                    {topProducts.length === 0 ? (
+                        <EmptyState message={ADMIN_OVERVIEW_LABELS.noTopProductData} />
                     ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={returnStats.byReason} layout="vertical" margin={{ left: 8, right: 12, top: 4, bottom: 4 }}>
-                                <CartesianGrid horizontal={false} stroke="#EEF1F5" />
-                                <XAxis type="number" hide />
-                                <YAxis
-                                    type="category"
-                                    dataKey="reason"
-                                    width={104}
-                                    tick={{ fontSize: 11, fill: '#4C5F7C' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                />
-                                <Tooltip content={<ChartTooltip />} cursor={{ fill: '#F4F6F9' }} />
-                                <Bar dataKey="count" fill={COLORS.brand} radius={[0, 4, 4, 0]} barSize={14} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        <table className="w-full text-left text-[12.5px]">
+                            <thead>
+                                <tr className="text-[11px] uppercase tracking-wide text-ink-400">
+                                    <th className="pb-2 font-medium">{ADMIN_OVERVIEW_LABELS.topProductNameHeader}</th>
+                                    <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.topProductQtyHeader}</th>
+                                    <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.topProductRevenueHeader}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {topProducts.map((p) => (
+                                    <tr key={p.product_id} className="border-t border-ink-50">
+                                        <td className="py-2.5 font-medium text-ink-900">{p.product_name}</td>
+                                        <td className="py-2.5 text-right font-data text-ink-600">{p.quantity_sold}</td>
+                                        <td className="py-2.5 text-right font-data text-ink-600">{formatCurrency(p.revenue)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     )}
-                </ChartCard>
-
-                <ChartCard
-                    title={ADMIN_OVERVIEW_LABELS.resolutionChartTitle}
-                    onExplore={() => onNavigate('returns')}
-                    empty={resolutionData.length === 0}
-                >
-                    {resolutionData.length === 0 ? (
-                        <EmptyChart message={ADMIN_OVERVIEW_LABELS.noReturnData} />
-                    ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={resolutionData}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    innerRadius={45}
-                                    outerRadius={70}
-                                    paddingAngle={3}
-                                    strokeWidth={0}
-                                    onClick={() => onNavigate('returns')}
-                                    className="cursor-pointer outline-none"
-                                >
-                                    {resolutionData.map((entry) => (
-                                        <Cell key={entry.name} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip content={<ChartTooltip />} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    )}
-                </ChartCard>
+                </PanelCard>
             </div>
         </div>
     );

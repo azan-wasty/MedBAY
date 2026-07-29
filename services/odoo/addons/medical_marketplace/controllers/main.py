@@ -357,6 +357,52 @@ class MedicalMarketplaceController(http.Controller):
         product.write({'marketplace_published': False})
         return self._json_response({'success': True, 'marketplace_published': False})
 
+    @http.route('/api/admin/products/top', type='http', auth='user', methods=['GET'], csrf=False)
+    def admin_top_products(self, **kwargs):
+        """Best-selling products across confirmed orders, ranked by revenue.
+
+        Powers the admin dashboard's Top Products table (replaces the old
+        verification/return charts with actionable sales data).
+        """
+        if resp := self._require_admin():
+            return resp
+
+        try:
+            limit = int(kwargs.get('limit', 5))
+        except (TypeError, ValueError):
+            limit = 5
+        limit = max(1, min(limit, 20))
+
+        lines = request.env['sale.order.line'].sudo().search([
+            ('order_id.state', 'in', ('sale', 'done')),
+            ('product_id', '!=', False),
+        ])
+
+        stats = {}
+        for line in lines:
+            product = line.product_id
+            entry = stats.setdefault(product.id, {
+                'product_id': product.id,
+                'product_name': product.display_name,
+                'quantity_sold': 0.0,
+                'revenue': 0.0,
+                'order_ids': set(),
+            })
+            entry['quantity_sold'] += line.product_uom_qty
+            entry['revenue'] += line.price_subtotal
+            entry['order_ids'].add(line.order_id.id)
+
+        ranked = sorted(stats.values(), key=lambda e: e['revenue'], reverse=True)[:limit]
+        result = [{
+            'product_id': e['product_id'],
+            'product_name': e['product_name'],
+            'quantity_sold': e['quantity_sold'],
+            'revenue': e['revenue'],
+            'order_count': len(e['order_ids']),
+        } for e in ranked]
+
+        return self._json_response(result)
+
     # ------------------------------------------------------------------
     # Auth
     # ------------------------------------------------------------------
@@ -871,15 +917,42 @@ class MedicalMarketplaceController(http.Controller):
 
         state_param = kwargs.get('state')
         if state_param:
-            domain = [('state', '=', state_param)]
+            states = [s.strip() for s in state_param.split(',') if s.strip()]
+            domain = [('state', 'in', states)]
         else:
-            domain = [('state', '=', 'draft')]
-        orders = request.env['sale.order'].sudo().search_read(
-            domain,
-            ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'carrier_id', 'tracking_reference'],
-            order='date_order desc',
+            # Default view: open quotations awaiting admin pricing or buyer response.
+            domain = [('state', 'in', ('draft', 'sent'))]
+        limit = kwargs.get('limit')
+        try:
+            limit = int(limit) if limit else None
+        except (TypeError, ValueError):
+            limit = None
+        orders = request.env['sale.order'].sudo().search(
+            domain, order='date_order desc', limit=limit,
         )
-        return self._json_response(orders)
+
+        result = []
+        for order in orders:
+            # Buyer's requested total: what they'd pay at their proposed unit
+            # prices (falls back to the current unit price on lines where the
+            # buyer didn't propose one), vs. amount_total which is the actual
+            # order total at the currently-set unit prices.
+            requested_total = sum(
+                (line.target_price_unit or line.price_unit) * line.product_uom_qty
+                for line in order.order_line
+            )
+            result.append({
+                'id': order.id,
+                'name': order.name,
+                'partner_id': (order.partner_id.id, order.partner_id.display_name) if order.partner_id else False,
+                'date_order': order.date_order,
+                'amount_total': order.amount_total,
+                'requested_total': requested_total,
+                'state': order.state,
+                'carrier_id': (order.carrier_id.id, order.carrier_id.display_name) if order.carrier_id else False,
+                'tracking_reference': order.tracking_reference or False,
+            })
+        return self._json_response(result)
 
     @http.route('/api/admin/rfq/<int:order_id>', type='http', auth='user', methods=['GET'], csrf=False)
     def admin_rfq_detail(self, order_id, **kwargs):
@@ -1075,6 +1148,17 @@ class MedicalMarketplaceController(http.Controller):
             # IDOR guard: verify this order belongs to the calling user's partner
             if not order.exists() or order.partner_id.id != user.partner_id.id:
                 return self._json_response({'error': 'Order not found'}, status=404)
+
+            # Returns can only be requested once the order has actually been delivered —
+            # mirrors the same outgoing-picking check used for the buyer-facing order stage.
+            outgoing = order.picking_ids.filtered(
+                lambda p: p.picking_type_id.code == 'outgoing'
+            )
+            if not outgoing or not all(p.state == 'done' for p in outgoing):
+                return self._json_response(
+                    {'error': 'This order has not been delivered yet, so it is not eligible for a return.'},
+                    status=400,
+                )
 
             reason = request.env['medical.return.reason'].sudo().browse(reason_category_id)
             if not reason.exists():
