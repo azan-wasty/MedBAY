@@ -2,10 +2,16 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, ShieldCheck, RotateCcw, Truck, ArrowUpRight } from 'lucide-react';
+import {
+    Building2, ShieldCheck, RotateCcw, Truck, ArrowUpRight,
+    DollarSign, PackageCheck, Receipt, Hourglass,
+} from 'lucide-react';
+import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 import { ADMIN_OVERVIEW_LABELS } from '@/lib/constants';
-import type { CompanyPartner, AdminReturnRequest, AdminOrder, AdminTopProduct } from '@/lib/odooClient';
+import type {
+    CompanyPartner, AdminReturnRequest, AdminOrder, AdminTopProduct, AdminAnalyticsSummary,
+} from '@/lib/odooClient';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -109,6 +115,19 @@ function EmptyState({ message }: { message: string }) {
     return <div className="flex h-full items-center justify-center text-[12.5px] text-ink-400">{message}</div>;
 }
 
+function RevenueTooltip({ active, payload, label }: any) {
+    if (!active || !payload?.length) return null;
+    const revenue = payload.find((p: any) => p.dataKey === 'revenue')?.value ?? 0;
+    const orders = payload.find((p: any) => p.dataKey === 'orders')?.value ?? 0;
+    return (
+        <div className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-[12.5px] shadow-soft-lg">
+            <div className="font-medium text-ink-900">{formatDate(label, { month: 'short', day: 'numeric' })}</div>
+            <div className="mt-0.5 font-data font-semibold text-brand-700">{formatCurrency(revenue)}</div>
+            <div className="text-[11px] text-ink-400">{orders} {orders === 1 ? 'order' : 'orders'}</div>
+        </div>
+    );
+}
+
 export function AdminOverview({
     refreshSignal,
     onNavigate,
@@ -121,6 +140,7 @@ export function AdminOverview({
     const [orders, setOrders] = useState<AdminOrder[]>([]);
     const [quotations, setQuotations] = useState<AdminOrder[]>([]);
     const [topProducts, setTopProducts] = useState<AdminTopProduct[]>([]);
+    const [analytics, setAnalytics] = useState<AdminAnalyticsSummary | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -128,19 +148,21 @@ export function AdminOverview({
         const loadAll = async () => {
             try {
                 setLoading(true);
-                const [companiesRes, returnsRes, ordersRes, quotationsRes, topProductsRes] = await Promise.all([
+                const [companiesRes, returnsRes, ordersRes, quotationsRes, topProductsRes, analyticsRes] = await Promise.all([
                     fetch('/api/admin/companies'),
                     fetch('/api/admin/returns'),
                     fetch('/api/rfq?state=sale'),
                     fetch('/api/admin/rfq?limit=5'),
                     fetch('/api/admin/products/top?limit=5'),
+                    fetch('/api/admin/analytics/summary?days=30'),
                 ]);
-                const [companiesData, returnsData, ordersData, quotationsData, topProductsData] = await Promise.all([
+                const [companiesData, returnsData, ordersData, quotationsData, topProductsData, analyticsData] = await Promise.all([
                     companiesRes.json(),
                     returnsRes.json(),
                     ordersRes.json(),
                     quotationsRes.json(),
                     topProductsRes.json(),
+                    analyticsRes.json(),
                 ]);
                 if (cancelled) return;
                 setCompanies(Array.isArray(companiesData) ? companiesData : []);
@@ -148,6 +170,7 @@ export function AdminOverview({
                 setOrders(Array.isArray(ordersData) ? ordersData.filter((o: any) => o.state === 'sale') : []);
                 setQuotations(Array.isArray(quotationsData) ? quotationsData : []);
                 setTopProducts(Array.isArray(topProductsData) ? topProductsData : []);
+                setAnalytics(analyticsData && !analyticsData.error ? analyticsData : null);
             } catch (err) {
                 console.error('Error loading admin overview:', err);
             } finally {
@@ -254,6 +277,90 @@ export function AdminOverview({
                         delay={0.15}
                     />
                 </button>
+            </div>
+
+            {/* Earnings & sales KPIs */}
+            <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <KpiCard
+                    icon={DollarSign}
+                    value={formatCurrency(analytics?.lifetime_revenue ?? 0)}
+                    label={ADMIN_OVERVIEW_LABELS.totalEarnings}
+                    subStat={ADMIN_OVERVIEW_LABELS.allTimeRevenue}
+                    subTone="positive"
+                    delay={0.2}
+                />
+                <KpiCard
+                    icon={PackageCheck}
+                    value={Math.round(analytics?.lifetime_items_sold ?? 0).toLocaleString()}
+                    label={ADMIN_OVERVIEW_LABELS.itemsSold}
+                    subStat={ADMIN_OVERVIEW_LABELS.unitsAcrossOrders}
+                    subTone="neutral"
+                    delay={0.25}
+                />
+                <KpiCard
+                    icon={Receipt}
+                    value={formatCurrency(analytics?.avg_order_value ?? 0)}
+                    label={ADMIN_OVERVIEW_LABELS.avgOrderValue}
+                    subStat={ADMIN_OVERVIEW_LABELS.perConfirmedOrder}
+                    subTone="neutral"
+                    delay={0.3}
+                />
+                <button className="text-left" onClick={() => onNavigate('companies') /* pipeline lives in RFQs; companies tab is closest existing nav */}>
+                    <KpiCard
+                        icon={Hourglass}
+                        value={formatCurrency(analytics?.pending_value ?? 0)}
+                        label={ADMIN_OVERVIEW_LABELS.pipelineValue}
+                        subStat={analytics?.pending_count ? `${analytics.pending_count} ${ADMIN_OVERVIEW_LABELS.quotesAwaitingConfirmation}` : undefined}
+                        subTone="warning"
+                        delay={0.35}
+                    />
+                </button>
+            </div>
+
+            {/* Revenue over time */}
+            <div className="mt-4">
+                <PanelCard title={`${ADMIN_OVERVIEW_LABELS.revenueChartTitle}`} empty={!analytics?.revenue_series?.length}>
+                    {!analytics?.revenue_series?.length ? (
+                        <EmptyState message={ADMIN_OVERVIEW_LABELS.noRevenueData} />
+                    ) : (
+                        <div className="h-[220px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={analytics.revenue_series} margin={{ left: -16, right: 8, top: 8, bottom: 4 }}>
+                                    <defs>
+                                        <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#0F7A6C" stopOpacity={0.35} />
+                                            <stop offset="100%" stopColor="#0F7A6C" stopOpacity={0.02} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEF1F0" />
+                                    <XAxis
+                                        dataKey="date"
+                                        tick={{ fontSize: 11, fill: '#94A3A0' }}
+                                        tickFormatter={(v) => formatDate(v, { month: 'short', day: 'numeric' })}
+                                        interval={Math.max(0, Math.ceil(analytics.revenue_series.length / 8) - 1)}
+                                        axisLine={false}
+                                        tickLine={false}
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 11, fill: '#94A3A0' }}
+                                        tickFormatter={(v) => (v >= 1000 ? `$${Math.round(v / 1000)}k` : `$${v}`)}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        width={48}
+                                    />
+                                    <Tooltip content={<RevenueTooltip />} />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="revenue"
+                                        stroke="#0F7A6C"
+                                        strokeWidth={2}
+                                        fill="url(#revenueFill)"
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </PanelCard>
             </div>
 
             {/* Actionable tables */}

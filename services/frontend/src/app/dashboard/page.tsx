@@ -73,6 +73,7 @@ export default function DashboardPage() {
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
   const [detailError, setDetailError] = useState<string>('');
   const [approving, setApproving] = useState<boolean>(false);
+  const [rfqToApprove, setRfqToApprove] = useState<RFQDetail | null>(null);
 
   const [showTracking, setShowTracking] = useState<boolean>(false);
   const [tracking, setTracking] = useState<OrderTracking | null>(null);
@@ -677,9 +678,8 @@ export default function DashboardPage() {
                                   ? `$${line.target_price_unit!.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                   : <span className="text-ink-300">—</span>}
                               </td>
-                              <td className={`px-3 py-2.5 text-right ${
-                                isAboveTarget ? 'text-amber-600 font-semibold' : 'text-ink-600'
-                              }`}>
+                              <td className={`px-3 py-2.5 text-right ${isAboveTarget ? 'text-amber-600 font-semibold' : 'text-ink-600'
+                                }`}>
                                 {line.price_unit > 0
                                   ? `$${line.price_unit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                   : 'Pending Quote'}

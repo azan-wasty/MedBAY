@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, ShieldAlert, Building2, RotateCcw, Truck, Ship } from 'lucide-react';
+import { Loader2, ShieldAlert, Building2, RotateCcw, Truck, Ship, FileText } from 'lucide-react';
 
 import {
   ADMIN_COMPANIES_LABELS,
@@ -346,6 +346,15 @@ export default function AdminPage() {
       setSuccessMsg(`Tracking details updated for order ${selectedOrderForTracking.name}.`);
       setSelectedOrderForTracking(null);
       setTrackingCarrierId('');
+      setTrackingReference('');
+      setRefreshSignal((s) => s + 1);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to update tracking.');
+    } finally {
+      setSubmittingTracking(false);
+    }
+  };
+
   const loadAdminRfqs = async () => {
     try {
       setAdminRfqsLoading(true);

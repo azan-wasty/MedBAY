@@ -622,6 +622,14 @@ export const odooClient = {
     });
   },
 
+  async adminAnalyticsSummary(sessionId: string, days = 30): Promise<AdminAnalyticsSummary> {
+    return this.request<AdminAnalyticsSummary>(`/api/admin/analytics/summary?days=${days}`, {
+      method: 'GET',
+      headers: { Cookie: `session_id=${sessionId}` },
+      cache: 'no-store',
+    });
+  },
+
   // --- Admin: RFQs / Quotations ---
 
   async adminListRfqs(sessionId: string, state?: string, limit?: number): Promise<AdminOrder[]> {
@@ -681,4 +689,26 @@ export interface AdminTopProduct {
   quantity_sold: number;
   revenue: number;
   order_count: number;
+}
+
+// Single day of the revenue series returned inside AdminAnalyticsSummary.
+export interface AdminRevenuePoint {
+  date: string;
+  revenue: number;
+  orders: number;
+}
+
+// Marketplace-wide earnings & sales analytics, as returned by
+// GET /api/admin/analytics/summary for the admin dashboard's KPI + chart row.
+export interface AdminAnalyticsSummary {
+  lifetime_revenue: number;
+  lifetime_order_count: number;
+  lifetime_items_sold: number;
+  avg_order_value: number;
+  pending_value: number;
+  pending_count: number;
+  window_days: number;
+  window_revenue: number;
+  window_orders: number;
+  revenue_series: AdminRevenuePoint[];
 }
