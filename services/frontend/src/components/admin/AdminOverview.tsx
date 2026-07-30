@@ -265,8 +265,7 @@ export function AdminOverview({
                         <table className="w-full text-left text-[12.5px]">
                             <thead>
                                 <tr className="text-[11px] uppercase tracking-wide text-ink-400">
-                                    <th className="pb-2 font-medium">{ADMIN_OVERVIEW_LABELS.quotationCompanyHeader}</th>
-                                    <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.quotationAmountHeader}</th>
+                                    <th className="pb-2 font-medium">{ADMIN_OVERVIEW_LABELS.quotationAmountHeader}</th>
                                     <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.quotationRequestedHeader}</th>
                                     <th className="pb-2 font-medium">{ADMIN_OVERVIEW_LABELS.quotationStatusHeader}</th>
                                     <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.quotationDateHeader}</th>
@@ -275,10 +274,7 @@ export function AdminOverview({
                             <tbody>
                                 {quotations.map((q) => (
                                     <tr key={q.id} className="border-t border-ink-50">
-                                        <td className="py-2.5 font-medium text-ink-900">
-                                            {Array.isArray(q.partner_id) ? q.partner_id[1] : '—'}
-                                        </td>
-                                        <td className="py-2.5 text-right font-data text-ink-900">{formatCurrency(q.amount_total)}</td>
+                                        <td className="py-2.5 font-data font-medium text-ink-900">{formatCurrency(q.amount_total)}</td>
                                         <td className="py-2.5 text-right font-data text-ink-500">
                                             {q.requested_total ? formatCurrency(q.requested_total) : '—'}
                                         </td>

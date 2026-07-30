@@ -105,12 +105,13 @@ class MedicalMarketplaceController(http.Controller):
             return 'cancelled'
 
         if order.state in ('sale', 'done'):
-            outgoing = order.picking_ids.filtered(
+            pickings = getattr(order, 'picking_ids', request.env['stock.picking'])
+            outgoing = pickings.filtered(
                 lambda p: p.picking_type_id.code == 'outgoing'
-            )
+            ) if hasattr(order, 'picking_ids') else request.env['stock.picking']
             if outgoing and all(p.state == 'done' for p in outgoing):
                 # All outgoing pickings done — check if invoice is paid
-                invoices = order.invoice_ids.filtered(lambda i: i.state == 'posted')
+                invoices = getattr(order, 'invoice_ids', request.env['account.move']).filtered(lambda i: i.state == 'posted')
                 if any(i.payment_state in ('paid', 'in_payment') for i in invoices):
                     return 'completed'
                 return 'delivered'
@@ -470,12 +471,19 @@ class MedicalMarketplaceController(http.Controller):
                 return self._json_response({'error': 'Invalid credentials'}, status=401)
 
             user = request.env['res.users'].sudo().browse(uid)
+            clean_name = user.name or ''
+            if not clean_name or clean_name.startswith('Partner #') or clean_name.startswith('Partner '):
+                if user.partner_id and user.partner_id.name and not user.partner_id.name.startswith('Partner #'):
+                    clean_name = user.partner_id.name
+                else:
+                    clean_name = user.login.split('@')[0].capitalize() if user.login else 'Organization'
+
             return self._json_response({
                 'success': True,
                 'session_id': request.session.sid,
                 'user': {
                     'id': user.id,
-                    'name': user.name,
+                    'name': clean_name,
                     'email': user.login,
                     'partner_id': user.partner_id.id,
                     'is_admin': user.has_group(ADMIN_GROUP_XMLID),
@@ -574,12 +582,23 @@ class MedicalMarketplaceController(http.Controller):
             user = request.env.user
             partner_id = user.partner_id.id
 
-            orders = request.env['sale.order'].sudo().search_read(
+            orders = request.env['sale.order'].sudo().search(
                 [('partner_id', '=', partner_id)],
-                ['id', 'name', 'date_order', 'amount_total', 'state', 'invoice_status']
             )
 
-            return self._json_response(orders)
+            result = []
+            for order in orders:
+                result.append({
+                    'id': order.id,
+                    'name': order.name,
+                    'date_order': order.date_order,
+                    'amount_total': order.amount_total,
+                    'state': order.state,
+                    'invoice_status': order.invoice_status,
+                    'buyer_stage': self._compute_buyer_stage(order),
+                })
+
+            return self._json_response(result)
 
         except Exception as e:
             _logger.exception("RFQ status fetch failed")
@@ -598,10 +617,10 @@ class MedicalMarketplaceController(http.Controller):
 
             pickings = order.picking_ids.sudo().read(
                 ['id', 'name', 'state', 'scheduled_date', 'date_done']
-            )
+            ) if hasattr(order, 'picking_ids') else []
             invoices = order.invoice_ids.sudo().read(
                 ['id', 'name', 'state', 'payment_state', 'amount_total', 'invoice_date']
-            )
+            ) if hasattr(order, 'invoice_ids') else []
 
             # Carrier & tracking info
             carrier_info = False
@@ -677,6 +696,8 @@ class MedicalMarketplaceController(http.Controller):
                 'date_order': order.date_order,
                 'amount_total': order.amount_total,
                 'buyer_notes': order.buyer_notes or None,
+                'rejection_reason': order.rejection_reason or None,
+                'last_counter_by': order.last_counter_by or None,
                 'lines': lines,
             })
         except Exception as e:
@@ -705,6 +726,75 @@ class MedicalMarketplaceController(http.Controller):
             })
         except Exception as e:
             _logger.exception("RFQ approval failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/rfq/<int:order_id>/reject', type='http', auth='user', methods=['POST'], csrf=False)
+    def reject_rfq(self, order_id, **kwargs):
+        """Allow buyer to reject a seller quote with an optional rejection reason."""
+        try:
+            body = json.loads(request.httprequest.data or '{}')
+            order = request.env['sale.order'].sudo().browse(order_id)
+            user = request.env.user
+
+            if not order.exists() or order.partner_id.id != user.partner_id.id:
+                return self._json_response({'error': 'Order not found'}, status=404)
+
+            reason = body.get('rejection_reason', '').strip()
+            order.write({
+                'state': 'cancel',
+                'rejection_reason': reason or 'Rejected by buyer.',
+                'last_counter_by': 'buyer',
+            })
+
+            return self._json_response({
+                'success': True,
+                'order_id': order.id,
+                'state': order.state,
+                'rejection_reason': order.rejection_reason,
+            })
+        except Exception as e:
+            _logger.exception("RFQ rejection failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/rfq/<int:order_id>/counter', type='http', auth='user', methods=['POST'], csrf=False)
+    def counter_rfq(self, order_id, **kwargs):
+        """Allow buyer to submit a counter-offer (update line target prices & notes), returning RFQ to draft."""
+        try:
+            body = json.loads(request.httprequest.data or '{}')
+            order = request.env['sale.order'].sudo().browse(order_id)
+            user = request.env.user
+
+            if not order.exists() or order.partner_id.id != user.partner_id.id:
+                return self._json_response({'error': 'Order not found'}, status=404)
+
+            lines_update = body.get('lines', [])
+            buyer_notes = body.get('buyer_notes')
+
+            for line_item in lines_update:
+                line = request.env['sale.order.line'].sudo().browse(line_item.get('line_id'))
+                if line.exists() and line.order_id.id == order.id:
+                    target_p = line_item.get('target_price_unit')
+                    if target_p is not None:
+                        line.write({'target_price_unit': float(target_p)})
+
+            vals = {
+                'state': 'draft',
+                'last_counter_by': 'buyer',
+            }
+            if buyer_notes is not None:
+                vals['buyer_notes'] = buyer_notes
+
+            order.write(vals)
+
+            return self._json_response({
+                'success': True,
+                'order_id': order.id,
+                'state': order.state,
+                'amount_total': order.amount_total,
+                'last_counter_by': order.last_counter_by,
+            })
+        except Exception as e:
+            _logger.exception("RFQ counter offer failed")
             return self._json_response({'error': str(e)}, status=500)
 
     # ------------------------------------------------------------------
@@ -981,6 +1071,8 @@ class MedicalMarketplaceController(http.Controller):
             'partner_name': order.partner_id.name,
             'amount_total': order.amount_total,
             'buyer_notes': order.buyer_notes or None,
+            'rejection_reason': order.rejection_reason or None,
+            'last_counter_by': order.last_counter_by or None,
             'lines': lines,
         })
 
@@ -1001,7 +1093,10 @@ class MedicalMarketplaceController(http.Controller):
                 if line.exists() and line.order_id.id == order.id:
                     line.write({'price_unit': line_update.get('price_unit', line.price_unit)})
 
-            order.write({'state': 'sent'})
+            order.write({
+                'state': 'sent',
+                'last_counter_by': 'seller',
+            })
 
             return self._json_response({
                 'success': True,
@@ -1011,6 +1106,35 @@ class MedicalMarketplaceController(http.Controller):
             })
         except Exception as e:
             _logger.exception("RFQ quoting failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/admin/rfq/<int:order_id>/reject', type='http', auth='user', methods=['POST'], csrf=False)
+    def admin_reject_rfq(self, order_id, **kwargs):
+        """Allow seller/admin to reject an RFQ or buyer counter request."""
+        if resp := self._require_admin():
+            return resp
+
+        try:
+            body = json.loads(request.httprequest.data or '{}')
+            order = request.env['sale.order'].sudo().browse(order_id)
+            if not order.exists():
+                return self._json_response({'error': 'RFQ not found'}, status=404)
+
+            reason = body.get('rejection_reason', '').strip()
+            order.write({
+                'state': 'cancel',
+                'rejection_reason': reason or 'Rejected by supplier.',
+                'last_counter_by': 'seller',
+            })
+
+            return self._json_response({
+                'success': True,
+                'order_id': order.id,
+                'state': order.state,
+                'rejection_reason': order.rejection_reason,
+            })
+        except Exception as e:
+            _logger.exception("Admin RFQ rejection failed")
             return self._json_response({'error': str(e)}, status=500)
 
     # ------------------------------------------------------------------
@@ -1151,9 +1275,10 @@ class MedicalMarketplaceController(http.Controller):
 
             # Returns can only be requested once the order has actually been delivered —
             # mirrors the same outgoing-picking check used for the buyer-facing order stage.
-            outgoing = order.picking_ids.filtered(
+            pickings = getattr(order, 'picking_ids', request.env['stock.picking'])
+            outgoing = pickings.filtered(
                 lambda p: p.picking_type_id.code == 'outgoing'
-            )
+            ) if hasattr(order, 'picking_ids') else request.env['stock.picking']
             if not outgoing or not all(p.state == 'done' for p in outgoing):
                 return self._json_response(
                     {'error': 'This order has not been delivered yet, so it is not eligible for a return.'},

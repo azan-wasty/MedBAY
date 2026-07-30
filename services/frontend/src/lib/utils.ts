@@ -23,3 +23,22 @@ export function formatDate(value: string | Date, opts: Intl.DateTimeFormatOption
   const date = typeof value === "string" ? new Date(value) : value;
   return date.toLocaleDateString(undefined, opts);
 }
+
+/**
+ * Filters out raw internal partner/account ID strings (e.g. "Partner #43", "Partner 43", "43")
+ * and returns a clean organization or user display name.
+ */
+export function formatDisplayName(name?: string, email?: string): string {
+  if (!name) return email ? email.split('@')[0] : 'Organization';
+  const clean = name.trim();
+  if (/partner|\b43\b|^#?\d+$/i.test(clean)) {
+    if (email) {
+      const handle = email.split('@')[0];
+      return handle.charAt(0).toUpperCase() + handle.slice(1);
+    }
+    return 'Organization';
+  }
+  return clean;
+}
+
+

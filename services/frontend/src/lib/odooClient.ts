@@ -104,6 +104,9 @@ export interface RFQItem {
   date_order: string;
   amount_total: number;
   state: string;
+  buyer_stage?: string;
+  rejection_reason?: string | null;
+  last_counter_by?: string | null;
 }
 
 export interface RFQLine {
@@ -124,6 +127,8 @@ export interface RFQDetail {
   date_order: string;
   amount_total: number;
   buyer_notes?: string | null;
+  rejection_reason?: string | null;
+  last_counter_by?: string | null;
   lines: RFQLine[];
 }
 
@@ -412,6 +417,28 @@ export const odooClient = {
     });
   },
 
+  async rejectRFQ(id: number | string, rejectionReason: string | undefined, sessionId: string) {
+    return this.request(`/api/rfq/${id}/reject`, {
+      method: 'POST',
+      headers: { Cookie: `session_id=${sessionId}` },
+      body: JSON.stringify({ rejection_reason: rejectionReason }),
+      cache: 'no-store',
+    });
+  },
+
+  async counterRFQ(
+    id: number | string,
+    data: { buyer_notes?: string; lines?: { line_id: number; target_price_unit?: number }[] },
+    sessionId: string
+  ) {
+    return this.request(`/api/rfq/${id}/counter`, {
+      method: 'POST',
+      headers: { Cookie: `session_id=${sessionId}` },
+      body: JSON.stringify(data),
+      cache: 'no-store',
+    });
+  },
+
   async getOrderTracking(orderId: number | string, sessionId: string): Promise<OrderTracking> {
     return this.request<OrderTracking>(`/api/orders/${orderId}/tracking`, {
       method: 'GET',
@@ -605,6 +632,15 @@ export const odooClient = {
     return this.request<AdminOrder[]>(`/api/admin/rfq${query}`, {
       method: 'GET',
       headers: { Cookie: `session_id=${sessionId}` },
+      cache: 'no-store',
+    });
+  },
+
+  async adminRejectRFQ(id: number | string, rejectionReason: string | undefined, sessionId: string) {
+    return this.request(`/api/admin/rfq/${id}/reject`, {
+      method: 'POST',
+      headers: { Cookie: `session_id=${sessionId}` },
+      body: JSON.stringify({ rejection_reason: rejectionReason }),
       cache: 'no-store',
     });
   },

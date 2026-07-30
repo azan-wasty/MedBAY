@@ -105,11 +105,25 @@ export const DASHBOARD_LABELS = {
 };
 
 export const ODOO_STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
-  draft: { label: "Draft", bg: "#f1f5f9", text: "#475569" },
-  sent: { label: "Approved", bg: "#dbeafe", text: "#1d4ed8" },
-  sale: { label: "Ordered", bg: "#d1fae5", text: "#065f46" },
+  draft: { label: "Under Review", bg: "#fef3c7", text: "#92400e" },
+  sent: { label: "Quoted (Awaiting Buyer)", bg: "#dbeafe", text: "#1d4ed8" },
+  sale: { label: "Confirmed", bg: "#d1fae5", text: "#065f46" },
   done: { label: "Completed", bg: "#e0f2fe", text: "#075985" },
-  cancel: { label: "Cancelled", bg: "#fee2e2", text: "#991b1b" },
+  cancel: { label: "Rejected by Buyer", bg: "#fee2e2", text: "#991b1b" },
+};
+
+export const RFQ_NEGOTIATION_LABELS = {
+  approveBtn: "Approve & Order",
+  counterBtn: "Counter Offer",
+  rejectBtn: "Reject Quote",
+  rejectionModalTitle: "Reject Quotation",
+  rejectionReasonPlaceholder: "Optional reason for rejection (e.g. price above budget, timeline too long)...",
+  confirmRejectBtn: "Confirm Rejection",
+  counterModalTitle: "Submit Counter Offer",
+  counterInstructions: "Propose new target prices per unit for the supplier to review.",
+  submitCounterBtn: "Submit Counter Offer",
+  rejectionBannerTitle: "Quotation Rejected",
+  counterBannerTitle: "Counter Offer Submitted",
 };
 
 export const STOCK_STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {

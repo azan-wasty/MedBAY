@@ -5,21 +5,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowRight,
   Loader2,
   ShieldCheck,
   FileText,
   Truck,
   CheckCircle2,
   Info,
-  Trash2,
+  Bell,
 } from 'lucide-react';
 
 import {
   DASHBOARD_LABELS, ODOO_STATUS_MAP, AUTH_LABELS,
-  TRACKING_LABELS, REVIEW_LABELS,
+  TRACKING_LABELS, REVIEW_LABELS, RFQ_NEGOTIATION_LABELS,
 } from '@/lib/constants';
 import type { RFQItem, User, RFQDetail, OrderTracking } from '@/lib/odooClient';
+import { formatDisplayName } from '@/lib/utils';
 import { Container } from '@/components/shared/Container';
 import { OrderStepper } from '@/components/dashboard/OrderStepper';
 import { BuyerOverview } from '@/components/dashboard/BuyerOverview';
@@ -85,6 +85,16 @@ export default function DashboardPage() {
   const [reviewError, setReviewError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState('');
 
+  // Negotiation states
+  const [rfqToReject, setRfqToReject] = useState<RFQDetail | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+
+  const [rfqToCounter, setRfqToCounter] = useState<RFQDetail | null>(null);
+  const [counterTargetPrices, setCounterTargetPrices] = useState<Record<number, string>>({});
+  const [counterNotesInput, setCounterNotesInput] = useState('');
+  const [submittingCounter, setSubmittingCounter] = useState(false);
+
   const handleOpenRFQ = async (rfq: RFQItem) => {
     setSelectedRfq(rfq);
     setDetailLoading(true);
@@ -109,24 +119,173 @@ export default function DashboardPage() {
     }
   };
 
-  const handleApproveRFQ = async (id: number) => {
+  // -------------------------------------------------------------------
+  // RFQ Negotiation Handlers: Accept, Reject, Counter
+  // -------------------------------------------------------------------
+
+  /**
+   * Step 1: Open 2-step purchase confirmation modal.
+   * Pauses control flow and displays itemized cost summary before placing binding order.
+   */
+  const handleOpenApproveModal = async (rfq: RFQItem | RFQDetail) => {
+    setSelectedRfq(null);
+    let detail: RFQDetail;
+    if ('lines' in rfq && Array.isArray((rfq as RFQDetail).lines)) {
+      detail = rfq as RFQDetail;
+    } else {
+      try {
+        const res = await fetch(`/api/rfq/${rfq.id}`);
+        detail = await res.json();
+      } catch {
+        detail = { id: rfq.id, name: rfq.name, state: rfq.state, date_order: rfq.date_order, amount_total: rfq.amount_total, lines: [] };
+      }
+    }
+    setRfqToApprove(detail);
+  };
+
+  /**
+   * Step 2: Finalize purchase order upon explicit buyer acceptance.
+   * Converts RFQ status from 'sent' -> 'sale' (Confirmed).
+   */
+  const handleConfirmApprove = async () => {
+    if (!rfqToApprove) return;
     try {
       setApproving(true);
       setDetailError('');
-      const res = await fetch(`/api/rfq/${id}/approve`, { method: 'POST' });
+      const res = await fetch(`/api/rfq/${rfqToApprove.id}/approve`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Failed to approve quotation.');
       }
 
-      setRfqItems((prev) => prev.map((item) => (item.id === id ? { ...item, state: 'sale' } : item)));
-      if (rfqDetail) {
+      setRfqItems((prev) => prev.map((item) => (item.id === rfqToApprove.id ? { ...item, state: 'sale' } : item)));
+      if (rfqDetail && rfqDetail.id === rfqToApprove.id) {
         setRfqDetail({ ...rfqDetail, state: 'sale' });
       }
+      setRfqToApprove(null);
     } catch (err: any) {
       setDetailError(err.message || 'An error occurred during approval.');
     } finally {
       setApproving(false);
+    }
+  };
+
+  /**
+   * Open rejection reason modal for buyer feedback.
+   */
+  const handleOpenRejectModal = async (rfq: RFQItem | RFQDetail) => {
+    setSelectedRfq(null);
+    let detail: RFQDetail;
+    if ('lines' in rfq && Array.isArray((rfq as RFQDetail).lines)) {
+      detail = rfq as RFQDetail;
+    } else {
+      try {
+        const res = await fetch(`/api/rfq/${rfq.id}`);
+        detail = await res.json();
+      } catch {
+        detail = { id: rfq.id, name: rfq.name, state: rfq.state, date_order: rfq.date_order, amount_total: rfq.amount_total, lines: [] };
+      }
+    }
+    setRfqToReject(detail);
+    setRejectionReasonInput('');
+  };
+
+  /**
+   * Reject quotation and prevent order creation.
+   * Converts RFQ status from 'sent'/'draft' -> 'cancel' ("Rejected by Buyer").
+   */
+  const handleConfirmReject = async () => {
+    if (!rfqToReject) return;
+    try {
+      setRejecting(true);
+      setDetailError('');
+      const res = await fetch(`/api/rfq/${rfqToReject.id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejection_reason: rejectionReasonInput }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to reject quotation.');
+      }
+
+      setRfqItems((prev) => prev.map((item) => (item.id === rfqToReject.id ? { ...item, state: 'cancel', rejection_reason: data.rejection_reason } : item)));
+      if (rfqDetail && rfqDetail.id === rfqToReject.id) {
+        setRfqDetail({ ...rfqDetail, state: 'cancel', rejection_reason: data.rejection_reason });
+      }
+      setRfqToReject(null);
+    } catch (err: any) {
+      setDetailError(err.message || 'Failed to reject quotation.');
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const handleOpenCounterModal = async (rfq: RFQItem | RFQDetail) => {
+    setSelectedRfq(null);
+    let detail: RFQDetail;
+    if ('lines' in rfq && Array.isArray((rfq as RFQDetail).lines)) {
+      detail = rfq as RFQDetail;
+    } else {
+      try {
+        const res = await fetch(`/api/rfq/${rfq.id}`);
+        detail = await res.json();
+      } catch {
+        detail = { id: rfq.id, name: rfq.name, state: rfq.state, date_order: rfq.date_order, amount_total: rfq.amount_total, lines: [] };
+      }
+    }
+    setRfqToCounter(detail);
+    const initialPrices: Record<number, string> = {};
+    if (detail.lines) {
+      detail.lines.forEach((l) => {
+        initialPrices[l.id] = String(l.target_price_unit ?? l.price_unit ?? '');
+      });
+    }
+    setCounterTargetPrices(initialPrices);
+    setCounterNotesInput(detail.buyer_notes || '');
+  };
+
+  const handleConfirmCounter = async () => {
+    if (!rfqToCounter) return;
+    try {
+      setSubmittingCounter(true);
+      setDetailError('');
+      const lines = rfqToCounter.lines.map((l) => ({
+        line_id: l.id,
+        target_price_unit: parseFloat(counterTargetPrices[l.id] || '0') || 0,
+      }));
+
+      const res = await fetch(`/api/rfq/${rfqToCounter.id}/counter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer_notes: counterNotesInput,
+          lines,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to submit counter offer.');
+      }
+
+      setRfqItems((prev) => prev.map((item) => (item.id === rfqToCounter.id ? { ...item, state: 'draft' } : item)));
+      if (rfqDetail && rfqDetail.id === rfqToCounter.id) {
+        setRfqDetail({
+          ...rfqDetail,
+          state: 'draft',
+          buyer_notes: counterNotesInput,
+          last_counter_by: 'buyer',
+          lines: rfqDetail.lines.map((l) => ({
+            ...l,
+            target_price_unit: parseFloat(counterTargetPrices[l.id] || '0') || l.target_price_unit,
+          })),
+        });
+      }
+      setRfqToCounter(null);
+    } catch (err: any) {
+      setDetailError(err.message || 'Failed to submit counter offer.');
+    } finally {
+      setSubmittingCounter(false);
     }
   };
 
@@ -198,7 +357,13 @@ export default function DashboardPage() {
     }
 
     try {
-      setUser(JSON.parse(storedUser));
+      const parsedUser: User = JSON.parse(storedUser);
+      if (parsedUser) {
+        parsedUser.name = formatDisplayName(parsedUser.name, parsedUser.email);
+        localStorage.setItem('med_user', JSON.stringify(parsedUser));
+        window.dispatchEvent(new Event('auth-updated'));
+      }
+      setUser(parsedUser);
     } catch {
       setErrorMsg(AUTH_LABELS.loginPrompt);
       setLoading(false);
@@ -225,6 +390,12 @@ export default function DashboardPage() {
           ? data.sort((a: RFQItem, b: RFQItem) => new Date(b.date_order).getTime() - new Date(a.date_order).getTime())
           : [];
         setRfqItems(sorted);
+
+        // Auto-prompt buyer if there is a pending quotation awaiting decision
+        const pendingQuoted = sorted.find((a: RFQItem) => a.state === 'sent');
+        if (pendingQuoted) {
+          handleOpenRFQ(pendingQuoted);
+        }
       } catch (err: any) {
         console.error('Error fetching dashboard RFQ statuses:', err);
         setErrorMsg(err.message || 'Unable to retrieve your RFQ history.');
@@ -254,12 +425,7 @@ export default function DashboardPage() {
   return (
     <div className="bg-ink-50/40 py-10 sm:py-14">
       <Container>
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          className="mb-8 flex flex-wrap items-center justify-between gap-4"
-        >
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl">
               {DASHBOARD_LABELS.title}
@@ -274,11 +440,27 @@ export default function DashboardPage() {
               {DASHBOARD_LABELS.statusVerified}
             </span>
           </div>
-        </motion.div>
+        </div>
 
         {errorMsg && (
           <div className="mb-6">
             <Alert variant="error">{errorMsg}</Alert>
+          </div>
+        )}
+
+        {rfqItems.some((item) => item.state === 'sent') && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/80 p-4 text-brand-950 shadow-soft-xs">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white">
+                <Bell className="h-4 w-4" />
+              </span>
+              <div>
+                <h4 className="text-sm font-semibold">Action Required: Supplier Quotation Ready</h4>
+                <p className="text-xs text-brand-800">
+                  The supplier has submitted / updated a quotation for your RFQ. Please review and choose to Approve &amp; Order, Counter Offer, or Reject.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -295,7 +477,7 @@ export default function DashboardPage() {
                 <span className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wide text-ink-400">
                   Organization
                 </span>
-                <strong className="font-medium text-ink-900">{user?.name}</strong>
+                <strong className="font-medium text-ink-900">{formatDisplayName(user?.name, user?.email)}</strong>
               </div>
               <div>
                 <span className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wide text-ink-400">
@@ -365,13 +547,57 @@ export default function DashboardPage() {
                                 <StatusBadge config={statusConfig} showDot />
                               </td>
                               <td className="px-4 py-3 text-right">
-                                <Button
-                                  size="sm"
-                                  variant={rfq.state === 'sent' ? 'brand' : 'outline'}
-                                  onClick={() => handleOpenRFQ(rfq)}
-                                >
-                                  {rfq.state === 'sent' ? 'Review & Approve' : 'Details'}
-                                </Button>
+                                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                  {rfq.state === 'sent' ? (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="brand"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                                        onClick={() => handleOpenApproveModal(rfq)}
+                                      >
+                                        Review &amp; Accept Quote
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-brand-200 text-brand-700 hover:bg-brand-50 font-semibold"
+                                        onClick={() => handleOpenCounterModal(rfq)}
+                                      >
+                                        Counter
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-red-200 text-red-600 hover:bg-red-50 font-semibold"
+                                        onClick={() => handleOpenRejectModal(rfq)}
+                                      >
+                                        Reject
+                                      </Button>
+                                    </>
+                                  ) : rfq.state === 'draft' ? (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleOpenRFQ(rfq)}
+                                      >
+                                        Details
+                                      </Button>
+                                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 border border-amber-200">
+                                        Awaiting Supplier
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleOpenRFQ(rfq)}
+                                    >
+                                      Details
+                                    </Button>
+                                  )}
+                                </div>
                               </td>
                             </motion.tr>
                           );
@@ -494,9 +720,37 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {rfqDetail.state === 'draft' && (
-                  <Alert variant="info" icon>
+                {rfqDetail.state === 'sent' && rfqDetail.last_counter_by === 'seller' ? (
+                  <Alert variant="warning" icon className="mb-4 border-amber-300 bg-amber-50 text-amber-950">
+                    <div className="text-[13px]">
+                      <strong>Seller Responded to Counter Offer:</strong> The supplier has reviewed your target prices and updated the quotation. Please review the final prices below and click <strong>Approve &amp; Order</strong> to accept, <strong>Counter Offer</strong> to negotiate further, or <strong>Reject Quote</strong>.
+                    </div>
+                  </Alert>
+                ) : rfqDetail.state === 'sent' ? (
+                  <Alert variant="info" icon className="mb-4 border-brand-200 bg-brand-50 text-brand-900">
+                    <div className="text-[13px]">
+                      <strong>Action Required — Quotation Received:</strong> The supplier has submitted a quotation for your review. Please review the unit prices below and select <strong>Approve &amp; Order</strong>, <strong>Counter Offer</strong>, or <strong>Reject Quote</strong>.
+                    </div>
+                  </Alert>
+                ) : null}
+
+                {rfqDetail.state === 'draft' && rfqDetail.last_counter_by === 'buyer' ? (
+                  <Alert variant="warning" icon className="mb-4">
+                    <span className="text-[13px]">
+                      <strong>Counter Offer Submitted:</strong> Your proposed target prices have been sent to the supplier. Awaiting supplier review.
+                    </span>
+                  </Alert>
+                ) : rfqDetail.state === 'draft' ? (
+                  <Alert variant="info" icon className="mb-4">
                     <span className="text-[13px]">We are reviewing your request. A formal quotation will be posted here shortly.</span>
+                  </Alert>
+                ) : null}
+
+                {rfqDetail.state === 'cancel' && (
+                  <Alert variant="error" icon className="mb-4">
+                    <div className="text-[13px]">
+                      <strong>Rejected by you</strong>{rfqDetail.rejection_reason ? `: ${rfqDetail.rejection_reason}` : ''}
+                    </div>
                   </Alert>
                 )}
 
@@ -689,16 +943,198 @@ export default function DashboardPage() {
             ) : null}
           </DialogBody>
 
-          <DialogFooter>
+          <DialogFooter className="flex-wrap items-center justify-between gap-2 sm:justify-between">
             <Button variant="outline" onClick={() => setSelectedRfq(null)}>
               Close
             </Button>
             {rfqDetail?.state === 'sent' && (
-              <Button variant="brand" onClick={() => handleApproveRFQ(rfqDetail.id)} disabled={approving}>
-                {approving && <Loader2 className="h-4 w-4 animate-spin" />}
-                Approve &amp; Order
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 font-semibold" onClick={() => handleOpenRejectModal(rfqDetail)}>
+                  Reject Quote
+                </Button>
+                <Button variant="outline" className="border-brand-200 text-brand-700 hover:bg-brand-50 font-semibold" onClick={() => handleOpenCounterModal(rfqDetail)}>
+                  Counter Offer
+                </Button>
+                <Button variant="brand" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold" onClick={() => handleOpenApproveModal(rfqDetail)} disabled={approving}>
+                  {approving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Accept &amp; Confirm Order
+                </Button>
+              </div>
             )}
+            {rfqDetail?.state === 'draft' && (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 border border-amber-200">
+                Under Supplier Review
+              </span>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Quote Modal */}
+      <Dialog open={!!rfqToReject} onOpenChange={(open) => !open && setRfqToReject(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{RFQ_NEGOTIATION_LABELS.rejectionModalTitle}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <p className="mb-3 text-[13px] text-ink-600">
+              Are you sure you want to reject this quotation from the supplier? You can optionally provide feedback or a reason below:
+            </p>
+            <Textarea
+              rows={3}
+              value={rejectionReasonInput}
+              onChange={(e) => setRejectionReasonInput(e.target.value)}
+              placeholder={RFQ_NEGOTIATION_LABELS.rejectionReasonPlaceholder}
+              disabled={rejecting}
+            />
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRfqToReject(null)} disabled={rejecting}>
+              Cancel
+            </Button>
+            <Button variant="brand" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleConfirmReject} disabled={rejecting}>
+              {rejecting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {RFQ_NEGOTIATION_LABELS.confirmRejectBtn}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Counter Offer Modal */}
+      <Dialog open={!!rfqToCounter} onOpenChange={(open) => !open && setRfqToCounter(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{RFQ_NEGOTIATION_LABELS.counterModalTitle}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <p className="mb-4 text-[13px] text-ink-600">
+              {RFQ_NEGOTIATION_LABELS.counterInstructions}
+            </p>
+            {rfqToCounter && (
+              <div className="mb-4 overflow-hidden rounded-lg border border-ink-100">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                      <th className="px-3 py-2">Product</th>
+                      <th className="px-3 py-2 text-right">Quoted Price</th>
+                      <th className="px-3 py-2 text-right">New Target Unit Price ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rfqToCounter.lines.map((l) => (
+                      <tr key={l.id} className="border-b border-ink-100 last:border-b-0">
+                        <td className="px-3 py-2.5 font-medium text-ink-900">{l.product_name}</td>
+                        <td className="px-3 py-2.5 text-right font-data text-ink-500">
+                          ${l.price_unit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="w-28 rounded-md border border-ink-200 px-2.5 py-1 text-right text-xs font-medium focus:border-brand-500 focus:outline-none"
+                            value={counterTargetPrices[l.id] ?? ''}
+                            onChange={(e) =>
+                              setCounterTargetPrices((prev) => ({
+                                ...prev,
+                                [l.id]: e.target.value,
+                              }))
+                            }
+                            disabled={submittingCounter}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-[12px] font-semibold text-ink-700">Counter Offer Notes / Budget Justification</label>
+              <Textarea
+                rows={2}
+                value={counterNotesInput}
+                onChange={(e) => setCounterNotesInput(e.target.value)}
+                placeholder="Explain why you are proposing this counter price (e.g. bulk order discount, competitor pricing)..."
+                disabled={submittingCounter}
+              />
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRfqToCounter(null)} disabled={submittingCounter}>
+              Cancel
+            </Button>
+            <Button variant="brand" onClick={handleConfirmCounter} disabled={submittingCounter}>
+              {submittingCounter && <Loader2 className="h-4 w-4 animate-spin" />}
+              {RFQ_NEGOTIATION_LABELS.submitCounterBtn}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Final Approval Confirmation Modal */}
+      <Dialog open={!!rfqToApprove} onOpenChange={(open) => !open && setRfqToApprove(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm &amp; Accept Quotation</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <Alert variant="warning" icon className="mb-4">
+              <span className="text-[13px]">
+                <strong>Final Order Confirmation:</strong> Are you sure you want to accept this quotation and place a binding order for <strong>{rfqToApprove?.name}</strong>?
+              </span>
+            </Alert>
+            {rfqToApprove && (
+              <div className="space-y-3 rounded-lg border border-ink-100 bg-ink-50/50 p-4 text-[13px]">
+                <div className="flex justify-between border-b border-ink-100 pb-2">
+                  <span className="text-ink-500">Quotation Ref:</span>
+                  <span className="font-data font-semibold text-ink-900">{rfqToApprove.name}</span>
+                </div>
+                <div className="flex justify-between border-b border-ink-100 pb-2">
+                  <span className="text-ink-500">Total Order Amount:</span>
+                  <strong className="font-data text-base text-brand-700">
+                    ${rfqToApprove.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </strong>
+                </div>
+                <div className="pt-1">
+                  <span className="mb-1 block text-xs font-semibold text-ink-600">Line Items:</span>
+                  <ul className="space-y-1 text-xs text-ink-700">
+                    {rfqToApprove.lines.map((l) => (
+                      <li key={l.id} className="flex justify-between">
+                        <span>{l.product_name} (x{l.product_uom_qty})</span>
+                        <span className="font-data">${l.price_subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </DialogBody>
+          <DialogFooter className="flex-wrap items-center justify-between gap-2 sm:justify-between">
+            <Button variant="outline" onClick={() => setRfqToApprove(null)} disabled={approving}>
+              Back / Review
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="border-red-200 text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  if (rfqToApprove) {
+                    const target = rfqToApprove;
+                    setRfqToApprove(null);
+                    handleOpenRejectModal(target);
+                  }
+                }}
+                disabled={approving}
+              >
+                Reject Quote
+              </Button>
+              <Button variant="brand" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold" onClick={handleConfirmApprove} disabled={approving}>
+                {approving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Confirm &amp; Accept Order
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -27,7 +27,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { AdminOverview } from '@/components/admin/AdminOverview';
 
-type TabValue = 'companies' | 'returns' | 'tracking';
+type TabValue = 'companies' | 'rfqs' | 'returns' | 'tracking';
 type CompanyFilterValue = '' | 'pending' | 'verified' | 'rejected';
 type ReturnFilterValue = '' | 'requested' | 'approved' | 'rejected';
 
@@ -110,6 +110,13 @@ export default function AdminPage() {
   const [trackingCarrierId, setTrackingCarrierId] = useState<string>('');
   const [trackingReference, setTrackingReference] = useState<string>('');
   const [submittingTracking, setSubmittingTracking] = useState(false);
+
+  // Admin RFQ Quoting state
+  const [adminRfqs, setAdminRfqs] = useState<AdminOrder[]>([]);
+  const [adminRfqsLoading, setAdminRfqsLoading] = useState(false);
+  const [selectedAdminRfq, setSelectedAdminRfq] = useState<any | null>(null);
+  const [quotingPrices, setQuotingPrices] = useState<Record<number, string>>({});
+  const [submittingQuote, setSubmittingQuote] = useState(false);
 
   const loadCompanies = async (status: CompanyFilterValue) => {
     try {
@@ -198,6 +205,8 @@ export default function AdminPage() {
     setSuccessMsg('');
     if (t === 'companies') {
       loadCompanies(companyFilter);
+    } else if (t === 'rfqs') {
+      loadAdminRfqs();
     } else if (t === 'returns') {
       loadReturns(returnFilter);
     } else if (t === 'tracking') {
@@ -337,13 +346,64 @@ export default function AdminPage() {
       setSuccessMsg(`Tracking details updated for order ${selectedOrderForTracking.name}.`);
       setSelectedOrderForTracking(null);
       setTrackingCarrierId('');
-      setTrackingReference('');
-      loadOrders();
-      setRefreshSignal((s) => s + 1);
+  const loadAdminRfqs = async () => {
+    try {
+      setAdminRfqsLoading(true);
+      setErrorMsg('');
+      const res = await fetch('/api/admin/rfq');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load RFQs');
+      setAdminRfqs(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to update tracking information.');
+      setErrorMsg(err.message || 'Unable to load RFQs.');
     } finally {
-      setSubmittingTracking(false);
+      setAdminRfqsLoading(false);
+    }
+  };
+
+  const handleOpenQuoteModal = async (rfq: AdminOrder) => {
+    setErrorMsg('');
+    try {
+      const res = await fetch(`/api/admin/rfq/${rfq.id}`);
+      const data = await res.json();
+      setSelectedAdminRfq(data);
+      const initialPrices: Record<number, string> = {};
+      if (data.lines) {
+        data.lines.forEach((l: any) => {
+          initialPrices[l.id] = String(l.price_unit > 0 ? l.price_unit : l.target_price_unit ?? '0');
+        });
+      }
+      setQuotingPrices(initialPrices);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Unable to load RFQ details.');
+    }
+  };
+
+  const handleConfirmSendQuotation = async () => {
+    if (!selectedAdminRfq) return;
+    try {
+      setSubmittingQuote(true);
+      setErrorMsg('');
+      const lines = selectedAdminRfq.lines.map((l: any) => ({
+        line_id: l.id,
+        price_unit: parseFloat(quotingPrices[l.id] || '0') || 0,
+      }));
+
+      const res = await fetch(`/api/admin/rfq/${selectedAdminRfq.id}/quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lines }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to send quotation.');
+
+      setSuccessMsg(`Quotation sent to buyer for ${selectedAdminRfq.name}. Awaiting buyer decision.`);
+      setSelectedAdminRfq(null);
+      loadAdminRfqs();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to send quotation.');
+    } finally {
+      setSubmittingQuote(false);
     }
   };
 
@@ -385,6 +445,10 @@ export default function AdminPage() {
                 <TabsTrigger value="companies">
                   <Building2 className="mr-1.5 h-3.5 w-3.5" />
                   Company Verification
+                </TabsTrigger>
+                <TabsTrigger value="rfqs">
+                  <FileText className="mr-1.5 h-3.5 w-3.5" />
+                  RFQ &amp; Quotations
                 </TabsTrigger>
                 <TabsTrigger value="returns">
                   <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
@@ -498,6 +562,64 @@ export default function AdminPage() {
               )}
             </TabsContent>
 
+            {/* TAB: RFQ & QUOTATION MANAGEMENT */}
+            <TabsContent value="rfqs">
+              {adminRfqsLoading ? (
+                <Skeleton className="h-56 w-full rounded-xl" />
+              ) : adminRfqs.length === 0 ? (
+                <EmptyPanel message="No RFQs awaiting vendor pricing or response." />
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-left text-[13px]">
+                      <thead>
+                        <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                          <th className="px-4 py-3">Reference</th>
+                          <th className="px-4 py-3">Buyer Company</th>
+                          <th className="px-4 py-3">Date Submitted</th>
+                          <th className="px-4 py-3">Target Total</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminRfqs.map((rfq) => {
+                          const statusConfig = ODOO_STATUS_MAP[rfq.state] || {
+                            label: rfq.state.toUpperCase(),
+                            bg: '#f1f5f9',
+                            text: '#475569',
+                          };
+                          const partnerName = Array.isArray(rfq.partner_id) ? rfq.partner_id[1] : 'Buyer';
+                          return (
+                            <tr key={rfq.id} className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40">
+                              <td className="px-4 py-3 font-data font-medium text-ink-900">{rfq.name}</td>
+                              <td className="px-4 py-3 text-ink-600 font-medium">{formatDisplayName(partnerName)}</td>
+                              <td className="px-4 py-3 text-ink-500">{new Date(rfq.date_order).toLocaleDateString()}</td>
+                              <td className="px-4 py-3 font-data font-medium text-ink-900">
+                                ${rfq.requested_total?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? '—'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <StatusBadge config={statusConfig} showDot />
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <Button
+                                  size="sm"
+                                  variant="brand"
+                                  onClick={() => handleOpenQuoteModal(rfq)}
+                                >
+                                  {rfq.state === 'draft' ? 'Set Prices & Send Quote' : 'View / Edit Quote'}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
             {/* TAB 2: RETURN REQUESTS */}
             <TabsContent value="returns">
               <FilterPills
@@ -521,7 +643,6 @@ export default function AdminPage() {
                         <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                           <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableRef}</th>
                           <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableOrder}</th>
-                          <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableCompany}</th>
                           <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableProduct}</th>
                           <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableReason}</th>
                           <th className="px-4 py-3">{ADMIN_RETURNS_LABELS.tableType}</th>
@@ -544,7 +665,6 @@ export default function AdminPage() {
                               >
                                 <td className="px-4 py-3 font-data font-medium text-ink-900">{r.name}</td>
                                 <td className="px-4 py-3 text-ink-600">{r.sale_order_name || '—'}</td>
-                                <td className="px-4 py-3 text-ink-500">{r.partner_name || '—'}</td>
                                 <td className="px-4 py-3">
                                   <div className="font-medium text-ink-900">{r.product_name}</div>
                                   <div className="text-xs text-ink-400">Qty: {r.quantity}</div>
@@ -609,7 +729,6 @@ export default function AdminPage() {
                       <thead>
                         <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                           <th className="px-4 py-3">Order Reference</th>
-                          <th className="px-4 py-3">Customer Company</th>
                           <th className="px-4 py-3">Date Confirmed</th>
                           <th className="px-4 py-3">Total Amount</th>
                           <th className="px-4 py-3">Shipment Tracking</th>
@@ -625,7 +744,6 @@ export default function AdminPage() {
                           return (
                             <tr key={o.id} className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40">
                               <td className="px-4 py-3 font-data font-medium text-ink-900">{o.name}</td>
-                              <td className="px-4 py-3 text-ink-600">{Array.isArray(o.partner_id) ? o.partner_id[1] : '—'}</td>
                               <td className="px-4 py-3 text-ink-500">{new Date(o.date_order).toLocaleDateString()}</td>
                               <td className="px-4 py-3 font-medium text-ink-900">
                                 ${o.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -733,6 +851,93 @@ export default function AdminPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      {/* Seller Quoting Modal */}
+      <Dialog open={!!selectedAdminRfq} onOpenChange={(open) => !open && setSelectedAdminRfq(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Set Prices &amp; Send Quotation to Buyer</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <Alert variant="info" icon className="mb-4">
+              <span className="text-[13px]">
+                <strong>Send Quotation to Buyer:</strong> Input unit prices for each line item below. Clicking <strong>Send Quotation to Buyer</strong> will update the status and prompt the buyer on their dashboard to <strong>Accept &amp; Confirm Order</strong>, <strong>Counter Offer</strong>, or <strong>Reject</strong>.
+              </span>
+            </Alert>
+            {selectedAdminRfq && (
+              <div className="space-y-4">
+                <div className="flex justify-between rounded-lg border border-ink-100 bg-ink-50/50 p-3 text-xs">
+                  <div>
+                    <span className="text-ink-500">Buyer Company:</span>{' '}
+                    <strong className="text-ink-900">{selectedAdminRfq.partner_name}</strong>
+                  </div>
+                  <div>
+                    <span className="text-ink-500">RFQ Ref:</span>{' '}
+                    <strong className="font-data text-ink-900">{selectedAdminRfq.name}</strong>
+                  </div>
+                </div>
+
+                {selectedAdminRfq.buyer_notes && (
+                  <div className="rounded-lg border border-brand-100 bg-brand-50/40 p-3 text-xs">
+                    <span className="mb-1 block font-semibold uppercase text-brand-600">Buyer Procurement Notes:</span>
+                    <p className="text-ink-700">{selectedAdminRfq.buyer_notes}</p>
+                  </div>
+                )}
+
+                <div className="overflow-hidden rounded-lg border border-ink-100">
+                  <table className="w-full text-left text-[13px]">
+                    <thead>
+                      <tr className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                        <th className="px-3 py-2">Product</th>
+                        <th className="px-3 py-2 text-center">Qty</th>
+                        <th className="px-3 py-2 text-right">Buyer Target ($)</th>
+                        <th className="px-3 py-2 text-right">Vendor Unit Price ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedAdminRfq.lines?.map((l: any) => (
+                        <tr key={l.id} className="border-b border-ink-100 last:border-b-0">
+                          <td className="px-3 py-2.5 font-medium text-ink-900">
+                            {Array.isArray(l.product_id) ? l.product_id[1] : l.product_id}
+                          </td>
+                          <td className="px-3 py-2.5 text-center text-ink-600">{l.product_uom_qty}</td>
+                          <td className="px-3 py-2.5 text-right font-data text-ink-500">
+                            {l.target_price_unit ? `$${l.target_price_unit.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="w-28 rounded-md border border-ink-200 px-2.5 py-1 text-right text-xs font-semibold focus:border-brand-500 focus:outline-none"
+                              value={quotingPrices[l.id] ?? ''}
+                              onChange={(e) =>
+                                setQuotingPrices((prev) => ({
+                                  ...prev,
+                                  [l.id]: e.target.value,
+                                }))
+                              }
+                              disabled={submittingQuote}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedAdminRfq(null)} disabled={submittingQuote}>
+              Cancel
+            </Button>
+            <Button variant="brand" onClick={handleConfirmSendQuotation} disabled={submittingQuote}>
+              {submittingQuote && <Loader2 className="h-4 w-4 animate-spin" />}
+              Send Quotation to Buyer
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

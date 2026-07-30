@@ -12,6 +12,7 @@ const alertVariants = cva(
         success: "border-emerald-200 bg-emerald-50 text-emerald-800",
         error: "border-red-200 bg-red-50 text-red-700",
         info: "border-azure-200 bg-azure-50 text-azure-800",
+        warning: "border-amber-200 bg-amber-50 text-amber-800",
       },
     },
     defaultVariants: { variant: "info" },
@@ -22,6 +23,7 @@ const icons = {
   success: CheckCircle2,
   error: AlertCircle,
   info: Info,
+  warning: AlertCircle,
 };
 
 export interface AlertProps

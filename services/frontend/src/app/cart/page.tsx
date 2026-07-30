@@ -93,8 +93,9 @@ export default function CartPage() {
 
   const handleSubmitRFQ = async () => {
     if (!isLoggedIn) {
-      // Redirect to login instead of showing an error — preserves cart in localStorage
-      router.push('/login');
+      // Redirect to login and preserve /cart as the post-login destination.
+      // Cart contents are safe in localStorage and will still be there after login.
+      router.push('/login?redirect=/cart');
       return;
     }
 

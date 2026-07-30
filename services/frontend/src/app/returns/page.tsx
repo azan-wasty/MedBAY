@@ -81,7 +81,11 @@ export default function ReturnsPage() {
         }
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to load orders');
-        const eligible = Array.isArray(data) ? data.filter((o: RFQItem) => o.state === 'sale') : [];
+        const eligible = Array.isArray(data)
+          ? data.filter((o: RFQItem) =>
+              o.buyer_stage === 'delivered' || o.buyer_stage === 'completed'
+            )
+          : [];
         setEligibleOrders(eligible);
       } catch (err) {
         console.error('Error loading eligible orders:', err);

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 
@@ -22,6 +22,8 @@ const TRUST_POINTS = [
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -59,8 +61,9 @@ export default function LoginPage() {
       // Dispatch custom auth-updated event to update the navigation bar dynamically
       window.dispatchEvent(new Event('auth-updated'));
 
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Redirect to the intended destination (e.g. /cart after an interrupted RFQ submission)
+      // or fall back to /dashboard if no redirect param was provided.
+      router.push(redirectTo);
       router.refresh();
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred during sign in.');

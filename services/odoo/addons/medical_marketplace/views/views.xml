@@ -40,7 +40,7 @@
         </field>
     </record>
 
-    <!-- Sale order line: show buyer's proposed target price (bid) -->
+    <!-- Sale order line: show buyer's proposed target price (bid) in FORM inline tree -->
     <record id="view_sale_order_form_medical_target_price" model="ir.ui.view">
         <field name="name">sale.order.form.medical.target_price</field>
         <field name="model">sale.order</field>
@@ -52,11 +52,16 @@
                        string="Buyer Target Price"
                        optional="show"
                        widget="monetary"
-                       attrs="{'invisible': [('target_price_unit', '=', 0)]}"
+                       invisible="target_price_unit == 0"
                        help="The unit price the buyer proposed when submitting the RFQ. 0 means no target was specified."/>
             </xpath>
         </field>
     </record>
+
+    <!-- Sale order line standalone list view: target price column removed.
+         sale.view_order_line_tree in Odoo 17 does not expose price_unit,
+         so the xpath anchor no longer exists. The buyer target price is
+         already visible in the order form view (view_sale_order_form_medical_target_price above). -->
 
     <!-- Partner form: verification fields -->
     <record id="view_partner_form_medical" model="ir.ui.view">

@@ -7,13 +7,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, ShoppingCart, LogOut, User as UserIcon } from "lucide-react";
 
 import { BRAND_CONFIG, NAV_LINKS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayName } from "@/lib/utils";
 import { Logo } from "@/components/shared/Logo";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 
 interface NavUser {
   name: string;
+  email?: string;
   is_admin?: boolean;
 }
 
@@ -31,7 +32,11 @@ export default function Navbar() {
       const storedUser = localStorage.getItem("med_user");
       if (storedUser) {
         try {
-          setUser(JSON.parse(storedUser));
+          const parsed = JSON.parse(storedUser);
+          if (parsed && parsed.name) {
+            parsed.name = formatDisplayName(parsed.name, parsed.email);
+          }
+          setUser(parsed);
         } catch {
           setUser(null);
         }
@@ -166,7 +171,7 @@ export default function Navbar() {
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1.5 text-[13.5px] font-medium text-ink-600">
                 <UserIcon className="h-3.5 w-3.5 text-ink-400" />
-                {user.name}
+                {formatDisplayName(user.name, user.email)}
               </span>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-3.5 w-3.5" />
@@ -242,7 +247,7 @@ export default function Navbar() {
                   <div className="flex items-center justify-between gap-3">
                     <span className="flex items-center gap-1.5 text-sm font-medium text-ink-700">
                       <UserIcon className="h-4 w-4 text-ink-400" />
-                      {user.name}
+                      {formatDisplayName(user.name, user.email)}
                     </span>
                     <Button variant="outline" size="sm" onClick={handleLogout}>
                       <LogOut className="h-3.5 w-3.5" />

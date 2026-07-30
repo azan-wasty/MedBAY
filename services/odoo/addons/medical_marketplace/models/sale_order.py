@@ -55,6 +55,16 @@ class SaleOrder(models.Model):
         string='Buyer Notes',
         help='Special instructions, target budget, or delivery timeline requests from the buyer.',
     )
+    rejection_reason = fields.Text(
+        string='Rejection Reason',
+        help='Optional feedback explaining why the RFQ or quotation was rejected.',
+    )
+    last_counter_by = fields.Selection(
+        [('buyer', 'Buyer'), ('seller', 'Seller')],
+        string='Last Counter By',
+        default=False,
+        help='Indicates who last updated/countered the RFQ prices or target terms.',
+    )
 
     # ------------------------------------------------------------------
     # Existing: quotation notification (unchanged)

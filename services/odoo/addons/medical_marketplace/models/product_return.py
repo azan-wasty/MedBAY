@@ -155,10 +155,11 @@ class MedicalReturnRequest(models.Model):
 
     def _find_delivery_picking(self):
         self.ensure_one()
-        pickings = self.sale_order_id.picking_ids.filtered(
+        all_pickings = getattr(self.sale_order_id, 'picking_ids', self.env['stock.picking'])
+        pickings = all_pickings.filtered(
             lambda p: p.state == 'done' and p.picking_type_id.code == 'outgoing'
             and self.product_id in p.move_ids.product_id
-        )
+        ) if hasattr(self.sale_order_id, 'picking_ids') else self.env['stock.picking']
         return pickings[:1]
 
     def _create_return_picking(self, picking):
