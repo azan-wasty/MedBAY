@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { odooClient, OdooSessionExpiredError, extractOdooStatus } from '../../../../lib/odooClient';
+import { odooClient, OdooSessionExpiredError, extractOdooStatus } from '../../../../../lib/odooClient';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,11 +13,12 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') ?? undefined;
+    const daysParam = searchParams.get('days');
+    const days = daysParam ? Number(daysParam) : 30;
 
     try {
-        const companies = await odooClient.adminListCompanies(session.value, status);
-        return NextResponse.json(companies, {
+        const summary = await odooClient.adminAnalyticsSummary(session.value, days);
+        return NextResponse.json(summary, {
             headers: {
                 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
                 'Pragma': 'no-cache',
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
             },
         });
     } catch (error: any) {
-        console.error('[admin/companies] Odoo companies list fetch failed:', error);
+        console.error('[admin/analytics/summary] Odoo analytics summary fetch failed:', error);
 
         if (error instanceof OdooSessionExpiredError) {
             cookies().delete('med_session');
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
 
         const status = extractOdooStatus(error?.message ?? '') ?? 502;
         return NextResponse.json(
-            { error: 'Failed to fetch companies from Odoo', detail: error?.message ?? 'Unknown error' },
+            { error: 'Failed to fetch analytics summary from Odoo', detail: error?.message ?? 'Unknown error' },
             { status }
         );
     }

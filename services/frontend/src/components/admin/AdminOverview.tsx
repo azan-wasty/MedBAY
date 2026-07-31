@@ -17,22 +17,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 type TabValue = 'companies' | 'returns' | 'tracking';
 
-const QUOTATION_STATE_STYLES: Record<string, string> = {
-    draft: 'bg-ink-50 text-ink-500',
-    sent: 'bg-amber-50 text-amber-800',
-    sale: 'bg-emerald-50 text-emerald-700',
-    done: 'bg-emerald-50 text-emerald-700',
-    cancel: 'bg-red-50 text-red-700',
-};
-
-const QUOTATION_STATE_LABELS: Record<string, string> = {
-    draft: 'Draft',
-    sent: 'Quoted',
-    sale: 'Confirmed',
-    done: 'Done',
-    cancel: 'Cancelled',
-};
-
 function KpiCard({
     icon: Icon,
     value,
@@ -138,7 +122,6 @@ export function AdminOverview({
     const [companies, setCompanies] = useState<CompanyPartner[]>([]);
     const [returns, setReturns] = useState<AdminReturnRequest[]>([]);
     const [orders, setOrders] = useState<AdminOrder[]>([]);
-    const [quotations, setQuotations] = useState<AdminOrder[]>([]);
     const [topProducts, setTopProducts] = useState<AdminTopProduct[]>([]);
     const [analytics, setAnalytics] = useState<AdminAnalyticsSummary | null>(null);
     const [loading, setLoading] = useState(true);
@@ -148,19 +131,17 @@ export function AdminOverview({
         const loadAll = async () => {
             try {
                 setLoading(true);
-                const [companiesRes, returnsRes, ordersRes, quotationsRes, topProductsRes, analyticsRes] = await Promise.all([
-                    fetch('/api/admin/companies'),
-                    fetch('/api/admin/returns'),
-                    fetch('/api/rfq?state=sale'),
-                    fetch('/api/admin/rfq?limit=5'),
-                    fetch('/api/admin/products/top?limit=5'),
-                    fetch('/api/admin/analytics/summary?days=30'),
+                const [companiesRes, returnsRes, ordersRes, topProductsRes, analyticsRes] = await Promise.all([
+                    fetch('/api/admin/companies', { cache: 'no-store' }),
+                    fetch('/api/admin/returns', { cache: 'no-store' }),
+                    fetch('/api/rfq?state=sale', { cache: 'no-store' }),
+                    fetch('/api/admin/products/top?limit=5', { cache: 'no-store' }),
+                    fetch('/api/admin/analytics/summary?days=30', { cache: 'no-store' }),
                 ]);
-                const [companiesData, returnsData, ordersData, quotationsData, topProductsData, analyticsData] = await Promise.all([
+                const [companiesData, returnsData, ordersData, topProductsData, analyticsData] = await Promise.all([
                     companiesRes.json(),
                     returnsRes.json(),
                     ordersRes.json(),
-                    quotationsRes.json(),
                     topProductsRes.json(),
                     analyticsRes.json(),
                 ]);
@@ -168,7 +149,6 @@ export function AdminOverview({
                 setCompanies(Array.isArray(companiesData) ? companiesData : []);
                 setReturns(Array.isArray(returnsData?.returns) ? returnsData.returns : []);
                 setOrders(Array.isArray(ordersData) ? ordersData.filter((o: any) => o.state === 'sale') : []);
-                setQuotations(Array.isArray(quotationsData) ? quotationsData : []);
                 setTopProducts(Array.isArray(topProductsData) ? topProductsData : []);
                 setAnalytics(analyticsData && !analyticsData.error ? analyticsData : null);
             } catch (err) {
@@ -305,7 +285,7 @@ export function AdminOverview({
                     subTone="neutral"
                     delay={0.3}
                 />
-                <button className="text-left" onClick={() => onNavigate('companies') /* pipeline lives in RFQs; companies tab is closest existing nav */}>
+                <button className="text-left" onClick={() => onNavigate('companies')}>
                     <KpiCard
                         icon={Hourglass}
                         value={formatCurrency(analytics?.pending_value ?? 0)}
@@ -363,46 +343,8 @@ export function AdminOverview({
                 </PanelCard>
             </div>
 
-            {/* Actionable tables */}
-            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <PanelCard title={ADMIN_OVERVIEW_LABELS.latestQuotationsTitle} empty={quotations.length === 0}>
-                    {quotations.length === 0 ? (
-                        <EmptyState message={ADMIN_OVERVIEW_LABELS.noQuotationData} />
-                    ) : (
-                        <table className="w-full text-left text-[12.5px]">
-                            <thead>
-                                <tr className="text-[11px] uppercase tracking-wide text-ink-400">
-                                    <th className="pb-2 font-medium">{ADMIN_OVERVIEW_LABELS.quotationAmountHeader}</th>
-                                    <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.quotationRequestedHeader}</th>
-                                    <th className="pb-2 font-medium">{ADMIN_OVERVIEW_LABELS.quotationStatusHeader}</th>
-                                    <th className="pb-2 text-right font-medium">{ADMIN_OVERVIEW_LABELS.quotationDateHeader}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {quotations.map((q) => (
-                                    <tr key={q.id} className="border-t border-ink-50">
-                                        <td className="py-2.5 font-data font-medium text-ink-900">{formatCurrency(q.amount_total)}</td>
-                                        <td className="py-2.5 text-right font-data text-ink-500">
-                                            {q.requested_total ? formatCurrency(q.requested_total) : '—'}
-                                        </td>
-                                        <td className="py-2.5">
-                                            <span
-                                                className={cn(
-                                                    'rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                                                    QUOTATION_STATE_STYLES[q.state] || 'bg-ink-50 text-ink-500'
-                                                )}
-                                            >
-                                                {QUOTATION_STATE_LABELS[q.state] || q.state}
-                                            </span>
-                                        </td>
-                                        <td className="py-2.5 text-right text-ink-500">{formatDate(q.date_order)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </PanelCard>
-
+            {/* Top Products */}
+            <div className="mt-4">
                 <PanelCard title={ADMIN_OVERVIEW_LABELS.topProductsTitle} empty={topProducts.length === 0}>
                     {topProducts.length === 0 ? (
                         <EmptyState message={ADMIN_OVERVIEW_LABELS.noTopProductData} />

@@ -12,6 +12,7 @@ import {
   COMPANY_STATUS_MAP,
   RETURN_STATUS_MAP,
   TRACKING_LABELS,
+  ODOO_STATUS_MAP,
 } from '@/lib/constants';
 import type { CompanyPartner, AdminReturnRequest, RFQItem, Carrier, User, AdminOrder } from '@/lib/odooClient';
 import { Container } from '@/components/shared/Container';
@@ -123,7 +124,7 @@ export default function AdminPage() {
       setCompaniesLoading(true);
       setErrorMsg('');
       const query = status ? `?status=${status}` : '';
-      const res = await fetch(`/api/admin/companies${query}`);
+      const res = await fetch(`/api/admin/companies${query}`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load companies');
       setCompanies(Array.isArray(data) ? data : []);
@@ -139,7 +140,7 @@ export default function AdminPage() {
       setReturnsLoading(true);
       setErrorMsg('');
       const query = status ? `?status=${status}` : '';
-      const res = await fetch(`/api/admin/returns${query}`);
+      const res = await fetch(`/api/admin/returns${query}`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load returns');
       setReturns(Array.isArray(data.returns) ? data.returns : []);
@@ -154,7 +155,7 @@ export default function AdminPage() {
     try {
       setOrdersLoading(true);
       setErrorMsg('');
-      const res = await fetch(`/api/rfq?state=sale`);
+      const res = await fetch(`/api/rfq?state=sale`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load orders');
       const confirmedOrders = Array.isArray(data) ? data.filter((o: any) => o.state === 'sale') : [];
@@ -168,7 +169,7 @@ export default function AdminPage() {
 
   const loadCarriers = async () => {
     try {
-      const carriersRes = await fetch(`/api/admin/carriers`);
+      const carriersRes = await fetch(`/api/admin/carriers`, { cache: 'no-store' });
       const data = await carriersRes.json();
       if (carriersRes.ok) {
         setCarriers(Array.isArray(data) ? data : []);
@@ -359,7 +360,7 @@ export default function AdminPage() {
     try {
       setAdminRfqsLoading(true);
       setErrorMsg('');
-      const res = await fetch('/api/admin/rfq');
+      const res = await fetch('/api/admin/rfq', { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load RFQs');
       setAdminRfqs(Array.isArray(data) ? data : []);
@@ -602,7 +603,7 @@ export default function AdminPage() {
                           return (
                             <tr key={rfq.id} className="border-b border-ink-100 last:border-b-0 hover:bg-ink-50/40">
                               <td className="px-4 py-3 font-data font-medium text-ink-900">{rfq.name}</td>
-                              <td className="px-4 py-3 text-ink-600 font-medium">{formatDisplayName(partnerName)}</td>
+                              <td className="px-4 py-3 text-ink-600 font-medium">{partnerName}</td>
                               <td className="px-4 py-3 text-ink-500">{new Date(rfq.date_order).toLocaleDateString()}</td>
                               <td className="px-4 py-3 font-data font-medium text-ink-900">
                                 ${rfq.requested_total?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? '—'}

@@ -1,4 +1,5 @@
 import base64
+import datetime
 import json
 import logging
 import os
@@ -1402,4 +1403,131 @@ class MedicalMarketplaceController(http.Controller):
             return self._json_response({'success': True, 'state': return_request.state})
         except Exception as e:
             _logger.exception("Return rejection failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    # ------------------------------------------------------------------
+    # Admin: Analytics & Top Products
+    # ------------------------------------------------------------------
+
+    @http.route('/api/admin/analytics/summary', type='http', auth='user', methods=['GET'], csrf=False)
+    def admin_analytics_summary(self, **kwargs):
+        """Marketplace-wide earnings & sales analytics summary for admin dashboard."""
+        if resp := self._require_admin():
+            return resp
+
+        try:
+            try:
+                days = int(kwargs.get('days', 30))
+            except (TypeError, ValueError):
+                days = 30
+
+            # Confirmed orders
+            confirmed_orders = request.env['sale.order'].sudo().search([('state', 'in', ('sale', 'done'))])
+            lifetime_revenue = float(sum(order.amount_total for order in confirmed_orders))
+            lifetime_order_count = len(confirmed_orders)
+
+            # Total items sold from confirmed order lines
+            confirmed_lines = request.env['sale.order.line'].sudo().search([('order_id.state', 'in', ('sale', 'done'))])
+            lifetime_items_sold = float(sum(line.product_uom_qty for line in confirmed_lines))
+
+            avg_order_value = (lifetime_revenue / lifetime_order_count) if lifetime_order_count > 0 else 0.0
+
+            # Pending quotes/RFQs
+            pending_orders = request.env['sale.order'].sudo().search([('state', 'in', ('draft', 'sent'))])
+            pending_value = float(sum(order.amount_total for order in pending_orders))
+            pending_count = len(pending_orders)
+
+            # Revenue series over the last `days` days
+            today = fields.Date.today()
+            date_from = today - datetime.timedelta(days=days - 1)
+
+            # Group confirmed orders by date_order
+            date_totals = {}
+            for i in range(days):
+                d_str = fields.Date.to_string(date_from + datetime.timedelta(days=i))
+                date_totals[d_str] = {'revenue': 0.0, 'orders': 0}
+
+            window_orders = 0
+            window_revenue = 0.0
+
+            for order in confirmed_orders:
+                if order.date_order:
+                    order_date_str = fields.Date.to_string(order.date_order.date() if hasattr(order.date_order, 'date') else order.date_order)
+                    if order_date_str in date_totals:
+                        date_totals[order_date_str]['revenue'] += float(order.amount_total)
+                        date_totals[order_date_str]['orders'] += 1
+                        window_revenue += float(order.amount_total)
+                        window_orders += 1
+
+            revenue_series = [
+                {'date': d, 'revenue': round(date_totals[d]['revenue'], 2), 'orders': date_totals[d]['orders']}
+                for d in sorted(date_totals.keys())
+            ]
+
+            return self._json_response({
+                'lifetime_revenue': round(lifetime_revenue, 2),
+                'lifetime_order_count': lifetime_order_count,
+                'lifetime_items_sold': round(lifetime_items_sold, 2),
+                'avg_order_value': round(avg_order_value, 2),
+                'pending_value': round(pending_value, 2),
+                'pending_count': pending_count,
+                'window_days': days,
+                'window_revenue': round(window_revenue, 2),
+                'window_orders': window_orders,
+                'revenue_series': revenue_series,
+            }, cache_control='no-store, no-cache, must-revalidate, max-age=0')
+        except Exception as e:
+            _logger.exception("Admin analytics summary failed")
+            return self._json_response({'error': str(e)}, status=500)
+
+    @http.route('/api/admin/products/top', type='http', auth='user', methods=['GET'], csrf=False)
+    def admin_top_products(self, **kwargs):
+        """Top best-selling products by revenue for admin dashboard."""
+        if resp := self._require_admin():
+            return resp
+
+        try:
+            try:
+                limit = int(kwargs.get('limit', 5))
+            except (TypeError, ValueError):
+                limit = 5
+
+            lines = request.env['sale.order.line'].sudo().search([('order_id.state', 'in', ('sale', 'done'))])
+
+            product_stats = {}
+            for line in lines:
+                product = line.product_id
+                if not product or not product.exists():
+                    continue
+                p_id = product.product_tmpl_id.id if hasattr(product, 'product_tmpl_id') and product.product_tmpl_id else product.id
+                p_name = product.display_name or product.name
+                if p_id not in product_stats:
+                    product_stats[p_id] = {
+                        'product_id': p_id,
+                        'product_name': p_name,
+                        'quantity_sold': 0.0,
+                        'revenue': 0.0,
+                        'order_ids': set(),
+                    }
+                product_stats[p_id]['quantity_sold'] += float(line.product_uom_qty)
+                product_stats[p_id]['revenue'] += float(line.price_subtotal)
+                if line.order_id:
+                    product_stats[p_id]['order_ids'].add(line.order_id.id)
+
+            sorted_products = sorted(product_stats.values(), key=lambda x: x['revenue'], reverse=True)[:limit]
+
+            result = [
+                {
+                    'product_id': p['product_id'],
+                    'product_name': p['product_name'],
+                    'quantity_sold': round(p['quantity_sold'], 2),
+                    'revenue': round(p['revenue'], 2),
+                    'order_count': len(p['order_ids']),
+                }
+                for p in sorted_products
+            ]
+
+            return self._json_response(result, cache_control='no-store, no-cache, must-revalidate, max-age=0')
+        except Exception as e:
+            _logger.exception("Admin top products failed")
             return self._json_response({'error': str(e)}, status=500)
