@@ -3,37 +3,30 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { FileText, CheckCircle2, PackageCheck, DollarSign, ArrowRight, ShoppingBag, RotateCcw, HelpCircle, AlertCircle } from 'lucide-react';
+import {
+  FileText,
+  CheckCircle2,
+  PackageCheck,
+  DollarSign,
+  ArrowRight,
+  ShoppingBag,
+  RotateCcw,
+  HelpCircle,
+  AlertCircle,
+} from 'lucide-react';
 
-import { BUYER_OVERVIEW_LABELS, ODOO_STATUS_MAP } from '@/lib/constants';
+import { BUYER_OVERVIEW_LABELS } from '@/lib/constants';
 import type { RFQItem } from '@/lib/odooClient';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const COLORS = {
-  draft: '#F59E0B',       // Amber (Under Review)
-  sent: '#0F7A6C',        // Teal/Brand (Quoted / Action Required)
-  sale: '#059669',        // Emerald (Confirmed / Order Placed)
-  cancel: '#94A3B8',      // Slate (Cancelled)
+  draft: '#F59E0B', // Amber (Under Review)
+  sent: '#0F7A6C', // Teal/Brand (Quoted / Action Required)
+  sale: '#059669', // Emerald (Confirmed / Order Placed)
+  cancel: '#94A3B8', // Slate (Cancelled)
   brand: '#0F7A6C',
-  azure: '#1D5FA6',
 };
-
-function ChartTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null;
-  const item = payload[0];
-  return (
-    <div className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-[12.5px] shadow-soft-lg">
-      <span className="font-medium text-ink-900">{item.name}</span>
-      <span className="ml-2 font-data font-semibold text-ink-600">
-        {typeof item.value === 'number' && item.unit === '$'
-          ? `$${item.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-          : item.value}
-      </span>
-    </div>
-  );
-}
 
 function KpiCard({
   icon: Icon,
@@ -139,25 +132,28 @@ export function BuyerOverview({
     };
   }, [rfqItems]);
 
-  const statusPieData = useMemo(() => {
+  const statusData = useMemo(() => {
     return [
-      { name: 'Quoted (Ready)', value: stats.sent, color: COLORS.sent },
-      { name: 'Under Review', value: stats.draft, color: COLORS.draft },
-      { name: 'Confirmed', value: stats.confirmed, color: COLORS.sale },
-      { name: 'Cancelled', value: stats.cancelled, color: COLORS.cancel },
-    ].filter((d) => d.value > 0);
+      { name: 'Quoted (Ready)', count: stats.sent, color: COLORS.sent },
+      { name: 'Under Review', count: stats.draft, color: COLORS.draft },
+      { name: 'Confirmed', count: stats.confirmed, color: COLORS.sale },
+      { name: 'Cancelled', count: stats.cancelled, color: COLORS.cancel },
+    ];
   }, [stats]);
 
   const barChartData = useMemo(() => {
     return rfqItems
-      .slice(0, 7)
+      .slice(0, 6)
       .reverse()
       .map((item) => ({
         name: item.name,
         amount: item.amount_total || 0,
-        unit: '$',
       }));
   }, [rfqItems]);
+
+  const maxBarAmount = useMemo(() => {
+    return Math.max(...barChartData.map((d) => d.amount), 100);
+  }, [barChartData]);
 
   return (
     <div className="mb-10">
@@ -217,9 +213,9 @@ export function BuyerOverview({
         />
         <KpiCard
           icon={DollarSign}
-          value={stats.totalQuotedValue > 0 ? `$${stats.totalQuotedValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '$0'}
+          value={stats.totalQuotedValue > 0 ? formatCurrency(stats.totalQuotedValue) : '$0.00'}
           label={BUYER_OVERVIEW_LABELS.totalSpend}
-          subStat={stats.confirmedValue > 0 ? `$${stats.confirmedValue.toLocaleString(undefined, { minimumFractionDigits: 0 })} ordered` : undefined}
+          subStat={stats.confirmedValue > 0 ? `${formatCurrency(stats.confirmedValue)} ordered` : undefined}
           subTone="brand"
           delay={0.15}
         />
@@ -227,30 +223,36 @@ export function BuyerOverview({
 
       {/* Charts & Shortcuts */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Status Pie Chart */}
-        <ChartCard title={BUYER_OVERVIEW_LABELS.statusChartTitle} empty={statusPieData.length === 0}>
-          {statusPieData.length === 0 ? (
+        {/* Status Breakdown */}
+        <ChartCard title={BUYER_OVERVIEW_LABELS.statusChartTitle} empty={stats.total === 0}>
+          {stats.total === 0 ? (
             <EmptyChart message={BUYER_OVERVIEW_LABELS.noRfqData} />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusPieData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={45}
-                  outerRadius={70}
-                  paddingAngle={3}
-                  strokeWidth={0}
-                  className="outline-none"
-                >
-                  {statusPieData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ChartTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="flex h-full flex-col justify-center space-y-3 pt-2">
+              <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-ink-100">
+                {statusData.map((d) => (
+                  <div
+                    key={d.name}
+                    style={{
+                      width: `${(d.count / stats.total) * 100}%`,
+                      backgroundColor: d.color,
+                    }}
+                    title={`${d.name}: ${d.count}`}
+                  />
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11.5px]">
+                {statusData.map((d) => (
+                  <div key={d.name} className="flex items-center justify-between rounded-md bg-ink-50 px-2.5 py-1">
+                    <span className="flex items-center gap-1.5 font-medium text-ink-700">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
+                      {d.name}
+                    </span>
+                    <span className="font-data font-semibold text-ink-900">{d.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </ChartCard>
 
@@ -259,15 +261,26 @@ export function BuyerOverview({
           {barChartData.length === 0 ? (
             <EmptyChart message={BUYER_OVERVIEW_LABELS.noSpendData} />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barChartData} margin={{ left: -16, right: 8, top: 8, bottom: 4 }}>
-                <CartesianGrid vertical={false} stroke="#EEF1F5" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: '#F4F6F9' }} />
-                <Bar dataKey="amount" fill={COLORS.brand} radius={[4, 4, 0, 0]} barSize={18} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="flex h-full items-end justify-between gap-2 pb-2 pt-4">
+              {barChartData.map((d, idx) => {
+                const heightPct = Math.max((d.amount / maxBarAmount) * 100, 8);
+                return (
+                  <div key={idx} className="flex flex-1 flex-col items-center gap-1">
+                    <div className="font-data text-[10px] font-medium text-ink-500">
+                      ${Math.round(d.amount)}
+                    </div>
+                    <div
+                      className="w-full max-w-[28px] rounded-t bg-brand-700 transition-all hover:bg-brand-600"
+                      style={{ height: `${heightPct}%` }}
+                      title={`${d.name}: ${formatCurrency(d.amount)}`}
+                    />
+                    <div className="truncate text-[10px] font-medium text-ink-600 max-w-[45px]">
+                      {d.name.replace('SO', '')}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </ChartCard>
 
@@ -280,36 +293,31 @@ export function BuyerOverview({
                 href="/"
                 className="flex items-center gap-2 rounded-lg border border-ink-100 bg-ink-50/50 p-2.5 text-[12.5px] font-medium text-ink-700 transition-colors hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-800"
               >
-                <ShoppingBag className="h-4 w-4 text-brand-600" />
-                <span>Browse Catalog</span>
+                <ShoppingBag className="h-4 w-4 text-brand-700" />
+                <span>Browse Products</span>
               </Link>
               <Link
                 href="/cart"
                 className="flex items-center gap-2 rounded-lg border border-ink-100 bg-ink-50/50 p-2.5 text-[12.5px] font-medium text-ink-700 transition-colors hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-800"
               >
-                <FileText className="h-4 w-4 text-brand-600" />
-                <span>Submit RFQ Cart</span>
+                <FileText className="h-4 w-4 text-brand-700" />
+                <span>Submit RFQ</span>
               </Link>
               <Link
                 href="/returns"
                 className="flex items-center gap-2 rounded-lg border border-ink-100 bg-ink-50/50 p-2.5 text-[12.5px] font-medium text-ink-700 transition-colors hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-800"
               >
-                <RotateCcw className="h-4 w-4 text-brand-600" />
+                <RotateCcw className="h-4 w-4 text-brand-700" />
                 <span>Request Return</span>
               </Link>
-              <a
-                href="#rfq-list"
+              <Link
+                href="/faq"
                 className="flex items-center gap-2 rounded-lg border border-ink-100 bg-ink-50/50 p-2.5 text-[12.5px] font-medium text-ink-700 transition-colors hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-800"
               >
-                <HelpCircle className="h-4 w-4 text-brand-600" />
-                <span>RFQ History</span>
-              </a>
+                <HelpCircle className="h-4 w-4 text-brand-700" />
+                <span>Help &amp; FAQ</span>
+              </Link>
             </div>
-          </div>
-
-          <div className="mt-4 rounded-lg bg-brand-50/70 p-3 border border-brand-100 text-[12px] leading-relaxed text-brand-900">
-            <span className="font-semibold block mb-0.5">Need custom bulk pricing?</span>
-            Add products to your RFQ cart or contact your assigned account manager for volume tiers and lead times.
           </div>
         </div>
       </div>

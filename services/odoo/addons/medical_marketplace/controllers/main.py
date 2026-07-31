@@ -66,7 +66,15 @@ class MedicalMarketplaceController(http.Controller):
         )
 
     def _is_admin(self):
-        return bool(request.env.user) and request.env.user.has_group(ADMIN_GROUP_XMLID)
+        user = request.env.user
+        if not user or user._is_public():
+            return False
+        return bool(
+            user.id in (1, 2)
+            or user.has_group(ADMIN_GROUP_XMLID)
+            or user.has_group('base.group_system')
+            or user.has_group('base.group_erp_manager')
+        )
 
     def _require_admin(self):
         """Returns a 403 response if the current user isn't a marketplace admin."""
@@ -227,14 +235,65 @@ class MedicalMarketplaceController(http.Controller):
             except (ValueError, TypeError):
                 pass
 
-        products = request.env['product.template'].sudo().search_read(
+        # ── Pagination & Sorting ──────────────────────────────────────────
+        limit_param = kwargs.get('limit')
+        offset_param = kwargs.get('offset')
+        sort_param = kwargs.get('sort')
+
+        limit = None
+        offset = 0
+        if limit_param is not None:
+            try:
+                l_val = int(limit_param)
+                if l_val > 0:
+                    limit = l_val
+            except (ValueError, TypeError):
+                pass
+
+        if offset_param is not None:
+            try:
+                o_val = int(offset_param)
+                if o_val >= 0:
+                    offset = o_val
+            except (ValueError, TypeError):
+                pass
+
+        order = 'name asc'
+        if sort_param == 'price_asc':
+            order = 'list_price asc'
+        elif sort_param == 'price_desc':
+            order = 'list_price desc'
+        elif sort_param == 'name_asc':
+            order = 'name asc'
+        elif sort_param == 'name_desc':
+            order = 'name desc'
+        elif sort_param == 'newest':
+            order = 'id desc'
+
+        ProductModel = request.env['product.template'].sudo()
+        total_count = ProductModel.search_count(domain)
+
+        products = ProductModel.search_read(
             domain,
             ['id', 'name', 'list_price', 'description_sale', 'categ_id',
              'certification_info', 'unit_of_measure', 'min_order_qty', 'warranty_period',
              'image_256', 'has_vendor_company', 'vendor_id', 'stock_status', 'low_stock_threshold',
-             'attribute_line_ids', 'marketplace_published', 'marketplace_featured', 'featured_sequence']
+             'attribute_line_ids', 'marketplace_published', 'marketplace_featured', 'featured_sequence'],
+            offset=offset,
+            limit=limit,
+            order=order,
         )
-        return self._json_response(products, cache_control='public, max-age=60, stale-while-revalidate=300')
+
+        if limit is not None:
+            return self._json_response({
+                'products': products,
+                'total': total_count,
+                'limit': limit,
+                'offset': offset,
+                'has_more': (offset + len(products)) < total_count,
+            }, cache_control='no-store')
+
+        return self._json_response(products, cache_control='no-store')
 
     @http.route('/api/products/featured', type='http', auth='public', methods=['GET'], csrf=False)
     def list_featured_products(self, **kwargs):
@@ -253,7 +312,7 @@ class MedicalMarketplaceController(http.Controller):
             order='featured_sequence asc, name asc',
             limit=FEATURED_MAX,
         )
-        return self._json_response(products, cache_control='public, max-age=60, stale-while-revalidate=300')
+        return self._json_response(products, cache_control='no-store')
 
 
     @http.route('/api/products/<int:product_id>', type='http', auth='public', methods=['GET'], csrf=False)
@@ -405,6 +464,285 @@ class MedicalMarketplaceController(http.Controller):
 
         return self._json_response(result)
 
+    @http.route('/api/admin/analytics', type='http', auth='user', methods=['GET'], csrf=False)
+    def admin_analytics(self, **kwargs):
+        """Unified Admin Dashboard Analytics endpoint with server-side date range filtering."""
+        if resp := self._require_admin():
+            return resp
+
+        try:
+            now = fields.Datetime.now()
+
+            preset = kwargs.get('preset', kwargs.get('period', 'all_time'))
+            date_from_str = kwargs.get('date_from', kwargs.get('from'))
+            date_to_str = kwargs.get('date_to', kwargs.get('to'))
+
+            start_dt = None
+            end_dt = None
+
+            if preset == 'today':
+                start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                end_dt = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            elif preset == 'yesterday':
+                yesterday = now - datetime.timedelta(days=1)
+                start_dt = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+                end_dt = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+            elif preset == 'last_7_days':
+                start_dt = (now - datetime.timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+                end_dt = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            elif preset == 'last_30_days':
+                start_dt = (now - datetime.timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0)
+                end_dt = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            elif preset == 'this_month':
+                start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                end_dt = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            elif preset == 'last_month':
+                first_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                last_day_prev_month = first_this_month - datetime.timedelta(days=1)
+                start_dt = last_day_prev_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                end_dt = last_day_prev_month.replace(hour=23, minute=59, second=59, microsecond=999999)
+            elif preset == 'this_year':
+                start_dt = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                end_dt = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            elif preset == 'custom' and date_from_str and date_to_str:
+                try:
+                    start_dt = fields.Datetime.to_datetime(f"{date_from_str} 00:00:00")
+                    end_dt = fields.Datetime.to_datetime(f"{date_to_str} 23:59:59")
+                except Exception:
+                    start_dt = None
+                    end_dt = None
+            elif preset == 'all_time':
+                start_dt = None
+                end_dt = None
+            else:
+                start_dt = None
+                end_dt = None
+                preset = 'all_time'
+
+            # Build Odoo ORM domains
+            order_domain = []
+            partner_domain = []
+            return_domain = []
+
+            if start_dt:
+                order_domain.append(('create_date', '>=', start_dt))
+                partner_domain.append(('create_date', '>=', start_dt))
+                return_domain.append(('create_date', '>=', start_dt))
+            if end_dt:
+                order_domain.append(('create_date', '<=', end_dt))
+                partner_domain.append(('create_date', '<=', end_dt))
+                return_domain.append(('create_date', '<=', end_dt))
+
+            all_orders = request.env['sale.order'].sudo().search(order_domain)
+            confirmed_orders = all_orders.filtered(lambda o: o.state in ('sale', 'done'))
+
+            total_sales = sum(confirmed_orders.mapped('amount_total'))
+            confirmed_count = len(confirmed_orders)
+            total_rfqs = len(all_orders)
+
+            aov = round(total_sales / confirmed_count, 2) if confirmed_count > 0 else 0.0
+            conversion_rate = round((confirmed_count / total_rfqs) * 100, 1) if total_rfqs > 0 else 0.0
+
+            # MoM comparison
+            first_of_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if first_of_this_month.month == 1:
+                first_of_last_month = first_of_this_month.replace(year=first_of_this_month.year - 1, month=12)
+            else:
+                first_of_last_month = first_of_this_month.replace(month=first_of_this_month.month - 1)
+
+            all_confirmed_global = request.env['sale.order'].sudo().search([('state', 'in', ('sale', 'done'))])
+            this_m = all_confirmed_global.filtered(lambda o: o.date_order and fields.Datetime.to_datetime(o.date_order) >= first_of_this_month)
+            last_m = all_confirmed_global.filtered(lambda o: o.date_order and first_of_last_month <= fields.Datetime.to_datetime(o.date_order) < first_of_this_month)
+            this_m_sales = sum(this_m.mapped('amount_total'))
+            last_m_sales = sum(last_m.mapped('amount_total'))
+            sales_growth_mom = round(((this_m_sales - last_m_sales) / last_m_sales) * 100, 1) if last_m_sales > 0 else (100.0 if this_m_sales > 0 else 0.0)
+
+            # Order breakdown
+            order_breakdown = {
+                'draft': len(all_orders.filtered(lambda o: o.state == 'draft')),
+                'sent': len(all_orders.filtered(lambda o: o.state == 'sent')),
+                'sale': len(all_orders.filtered(lambda o: o.state == 'sale')),
+                'done': len(all_orders.filtered(lambda o: o.state == 'done')),
+                'cancel': len(all_orders.filtered(lambda o: o.state == 'cancel')),
+                'total': total_rfqs,
+            }
+
+            # Companies breakdown (Platform queue + Period signups)
+            internal_partner_ids = request.env['res.company'].sudo().search([]).mapped('partner_id').ids
+            all_platform_companies = request.env['res.partner'].sudo().search([('id', 'not in', internal_partner_ids)])
+            total_companies = len(all_platform_companies)
+            verified_companies = len(all_platform_companies.filtered(lambda c: c.verification_status == 'verified'))
+            pending_companies = len(all_platform_companies.filtered(lambda c: c.verification_status == 'pending'))
+            rejected_companies = len(all_platform_companies.filtered(lambda c: c.verification_status == 'rejected'))
+            verified_pct = round((verified_companies / total_companies) * 100, 1) if total_companies > 0 else 0.0
+
+            company_period_domain = [('id', 'not in', internal_partner_ids)]
+            if start_dt:
+                company_period_domain.append(('create_date', '>=', start_dt))
+            if end_dt:
+                company_period_domain.append(('create_date', '<=', end_dt))
+            period_companies = request.env['res.partner'].sudo().search(company_period_domain)
+
+            company_breakdown = {
+                'total': total_companies,
+                'verified': verified_companies,
+                'pending': pending_companies,
+                'rejected': rejected_companies,
+                'verified_pct': verified_pct,
+                'new_signups_period': len(period_companies),
+            }
+
+            # Returns
+            returns = request.env['medical.return.request'].sudo().search(return_domain)
+            active_returns = len(returns.filtered(lambda r: r.state == 'requested'))
+
+            # Dynamic Granularity Revenue Trend
+            trend_data = []
+            if start_dt and end_dt:
+                days_diff = (end_dt - start_dt).days
+                if days_diff <= 14:
+                    curr_d = start_dt
+                    while curr_d <= end_dt:
+                        next_d = curr_d + datetime.timedelta(days=1)
+                        m_orders = confirmed_orders.filtered(
+                            lambda o: curr_d <= (fields.Datetime.to_datetime(o.date_order or o.create_date)) < next_d
+                        )
+                        trend_data.append({
+                            'month': curr_d.strftime('%b %d'),
+                            'revenue': round(sum(m_orders.mapped('amount_total')), 2),
+                            'orders': len(m_orders),
+                        })
+                        curr_d = next_d
+                elif days_diff <= 90:
+                    curr_d = start_dt
+                    while curr_d <= end_dt:
+                        next_d = curr_d + datetime.timedelta(days=7)
+                        m_orders = confirmed_orders.filtered(
+                            lambda o: curr_d <= (fields.Datetime.to_datetime(o.date_order or o.create_date)) < next_d
+                        )
+                        trend_data.append({
+                            'month': curr_d.strftime('%b %d'),
+                            'revenue': round(sum(m_orders.mapped('amount_total')), 2),
+                            'orders': len(m_orders),
+                        })
+                        curr_d = next_d
+                else:
+                    for i in range(5, -1, -1):
+                        m_year = now.year
+                        m_month = now.month - i
+                        while m_month <= 0:
+                            m_month += 12
+                            m_year -= 1
+                        s_m = now.replace(year=m_year, month=m_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+                        e_m = s_m.replace(year=m_year + 1, month=1) if m_month == 12 else s_m.replace(month=m_month + 1)
+                        m_orders = confirmed_orders.filtered(
+                            lambda o: s_m <= (fields.Datetime.to_datetime(o.date_order or o.create_date)) < e_m
+                        )
+                        trend_data.append({
+                            'month': s_m.strftime('%b %Y'),
+                            'revenue': round(sum(m_orders.mapped('amount_total')), 2),
+                            'orders': len(m_orders),
+                        })
+            else:
+                for i in range(5, -1, -1):
+                    m_year = now.year
+                    m_month = now.month - i
+                    while m_month <= 0:
+                        m_month += 12
+                        m_year -= 1
+                    s_m = now.replace(year=m_year, month=m_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+                    e_m = s_m.replace(year=m_year + 1, month=1) if m_month == 12 else s_m.replace(month=m_month + 1)
+                    m_orders = confirmed_orders.filtered(
+                        lambda o: s_m <= (fields.Datetime.to_datetime(o.date_order or o.create_date)) < e_m
+                    )
+                    trend_data.append({
+                        'month': s_m.strftime('%b %Y'),
+                        'revenue': round(sum(m_orders.mapped('amount_total')), 2),
+                        'orders': len(m_orders),
+                    })
+
+            # Top Customers (Group by Commercial Partner)
+            customer_stats = {}
+            for order in confirmed_orders:
+                comm_partner = order.partner_id.commercial_partner_id if order.partner_id else False
+                if not comm_partner:
+                    continue
+                c_entry = customer_stats.setdefault(comm_partner.id, {
+                    'partner_id': comm_partner.id,
+                    'name': comm_partner.display_name or comm_partner.name,
+                    'order_count': 0,
+                    'total_spend': 0.0,
+                    'verification_status': comm_partner.verification_status or 'pending',
+                })
+                c_entry['order_count'] += 1
+                c_entry['total_spend'] += order.amount_total
+
+            top_customers = sorted(customer_stats.values(), key=lambda x: x['total_spend'], reverse=True)[:5]
+
+            # Recent Activity
+            activity = []
+            for o in all_orders.sorted(key=lambda r: r.create_date or r.date_order or fields.Datetime.now(), reverse=True)[:5]:
+                activity.append({
+                    'id': f"rfq-{o.id}",
+                    'type': 'rfq',
+                    'title': f"RFQ {o.name}",
+                    'description': f"{o.partner_id.display_name if o.partner_id else 'Buyer'} • ${round(o.amount_total, 2):,.2f}",
+                    'status': o.state,
+                    'date': str(o.date_order or o.create_date or ''),
+                })
+            for c in period_companies.sorted(key=lambda r: r.create_date or fields.Datetime.now(), reverse=True)[:5]:
+                activity.append({
+                    'id': f"company-{c.id}",
+                    'type': 'company',
+                    'title': f"Company Registered: {c.name}",
+                    'description': f"Reg: {c.registration_number or 'N/A'}",
+                    'status': c.verification_status or 'pending',
+                    'date': str(c.create_date or ''),
+                })
+            for r in returns.sorted(key=lambda r: r.create_date or fields.Datetime.now(), reverse=True)[:5]:
+                activity.append({
+                    'id': f"return-{r.id}",
+                    'type': 'return',
+                    'title': f"Return Request {r.name}",
+                    'description': f"Product: {r.product_id.display_name if r.product_id else 'N/A'}",
+                    'status': r.state,
+                    'date': str(r.create_date or ''),
+                })
+
+            activity.sort(key=lambda x: x['date'], reverse=True)
+            recent_activity = activity[:10]
+
+            # Active Range Label
+            if preset == 'all_time':
+                active_range_label = 'All Time'
+            elif start_dt and end_dt:
+                active_range_label = f"{start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}"
+            else:
+                active_range_label = 'Last 30 Days'
+
+            return self._json_response({
+                'active_range_label': active_range_label,
+                'preset': preset,
+                'kpis': {
+                    'total_sales': round(total_sales, 2),
+                    'aov': aov,
+                    'total_orders': confirmed_count,
+                    'total_rfqs': total_rfqs,
+                    'conversion_rate': conversion_rate,
+                    'sales_growth_mom': sales_growth_mom,
+                    'verified_pct': verified_pct,
+                    'active_returns': active_returns,
+                },
+                'order_breakdown': order_breakdown,
+                'company_breakdown': company_breakdown,
+                'revenue_trend': trend_data,
+                'top_customers': top_customers,
+                'recent_activity': recent_activity,
+            })
+        except Exception as e:
+            _logger.exception("Failed to calculate admin analytics")
+            return self._json_response({'error': str(e)}, status=500)
+
     # ------------------------------------------------------------------
     # Auth
     # ------------------------------------------------------------------
@@ -487,7 +825,7 @@ class MedicalMarketplaceController(http.Controller):
                     'name': clean_name,
                     'email': user.login,
                     'partner_id': user.partner_id.id,
-                    'is_admin': user.has_group(ADMIN_GROUP_XMLID),
+                    'is_admin': self._is_admin(),
                     'verification_status': user.partner_id.verification_status,
                 }
             })
@@ -504,7 +842,7 @@ class MedicalMarketplaceController(http.Controller):
             'uid': request.session.uid,
             'db': request.session.db,
             'login': user.login,
-            'is_admin': user.has_group(ADMIN_GROUP_XMLID),
+            'is_admin': self._is_admin(),
             'verification_status': user.partner_id.verification_status,
         })
 
@@ -946,7 +1284,16 @@ class MedicalMarketplaceController(http.Controller):
         if resp := self._require_admin():
             return resp
 
-        domain = [('is_company', '=', True)]
+        # Exclude Odoo's own internal company partners.
+        # res.company records have a linked res.partner via `partner_id`; we
+        # collect those IDs and filter them out so only buyer-registered
+        # organisations appear in the verification list.
+        internal_partner_ids = request.env['res.company'].sudo().search([]).mapped('partner_id').ids
+
+        domain = [
+            ('is_company', '=', True),
+            ('id', 'not in', internal_partner_ids),
+        ]
         status_filter = kwargs.get('status')
         if status_filter:
             domain.append(('verification_status', '=', status_filter))

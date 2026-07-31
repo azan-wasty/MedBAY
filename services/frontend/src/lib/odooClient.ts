@@ -120,6 +120,14 @@ export interface RFQLine {
   target_price_unit?: number | null;
 }
 
+export interface PaginatedProductsResponse {
+  products: Product[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
 export interface RFQDetail {
   id: number;
   name: string;
@@ -304,25 +312,48 @@ export const odooClient = {
     return res.json() as Promise<T>;
   },
 
-  async getProducts(search?: string): Promise<Product[]> {
-    const query = search ? `?search=${encodeURIComponent(search)}` : '';
-    return this.request<Product[]>(`/api/products${query}`, {
+  async getProducts(
+    options?: {
+      search?: string;
+      limit?: number;
+      offset?: number;
+      category?: string;
+      sort?: string;
+      min_price?: number;
+      max_price?: number;
+    } | string
+  ): Promise<Product[] | PaginatedProductsResponse> {
+    const params = new URLSearchParams();
+    if (typeof options === 'string') {
+      if (options) params.set('search', options);
+    } else if (options) {
+      if (options.search) params.set('search', options.search);
+      if (options.limit !== undefined) params.set('limit', String(options.limit));
+      if (options.offset !== undefined) params.set('offset', String(options.offset));
+      if (options.category) params.set('category', options.category);
+      if (options.sort) params.set('sort', options.sort);
+      if (options.min_price !== undefined) params.set('min_price', String(options.min_price));
+      if (options.max_price !== undefined) params.set('max_price', String(options.max_price));
+    }
+
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request<Product[] | PaginatedProductsResponse>(`/api/products${query}`, {
       method: 'GET',
-      next: { revalidate: 10 },
+      cache: 'no-store',
     });
   },
 
   async getFeaturedProducts(): Promise<Product[]> {
     return this.request<Product[]>('/api/products/featured', {
       method: 'GET',
-      next: { revalidate: 10 },
+      cache: 'no-store',
     });
   },
 
   async getProductDetail(id: number | string): Promise<Product> {
     return this.request<Product>(`/api/products/${id}`, {
       method: 'GET',
-      next: { revalidate: 10 },
+      cache: 'no-store',
     });
   },
 
@@ -330,7 +361,7 @@ export const odooClient = {
     const query = pricelistId ? `?pricelist_id=${pricelistId}` : '';
     return this.request<ProductPricing>(`/api/products/${id}/pricing${query}`, {
       method: 'GET',
-      next: { revalidate: 30 },
+      cache: 'no-store',
     });
   },
 
@@ -384,11 +415,15 @@ export const odooClient = {
     });
   },
 
-  async createRFQ(items: { product_id: number; variant_id?: number; quantity: number }[], sessionId: string) {
+  async createRFQ(
+    items: { product_id: number; variant_id?: number; quantity: number }[],
+    sessionId: string,
+    notes?: string
+  ) {
     return this.request('/api/rfq', {
       method: 'POST',
       headers: { Cookie: `session_id=${sessionId}` },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ items, notes }),
       cache: 'no-store',
     });
   },
@@ -452,7 +487,7 @@ export const odooClient = {
   async getReturnReasons(): Promise<ReturnReason[]> {
     return this.request<ReturnReason[]>('/api/returns/reasons', {
       method: 'GET',
-      next: { revalidate: 60 },
+      cache: 'no-store',
     });
   },
 
@@ -671,7 +706,86 @@ export const odooClient = {
       cache: 'no-store',
     });
   },
+
+  async getAdminAnalytics(
+    sessionId: string,
+    params?: { date_from?: string; date_to?: string; preset?: string }
+  ): Promise<AdminAnalyticsData> {
+    const query = new URLSearchParams();
+    if (params?.preset) query.set('preset', params.preset);
+    if (params?.date_from) query.set('date_from', params.date_from);
+    if (params?.date_to) query.set('date_to', params.date_to);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<AdminAnalyticsData>(`/api/admin/analytics${queryString}`, {
+      method: 'GET',
+      headers: { Cookie: `session_id=${sessionId}` },
+      cache: 'no-store',
+    });
+  },
 };
+
+// Unified analytics data structure for admin dashboard
+export interface AdminAnalyticsKPIs {
+  total_sales: number;
+  aov: number;
+  total_orders: number;
+  total_rfqs: number;
+  conversion_rate: number;
+  sales_growth_mom: number;
+  orders_growth_mom?: number;
+  verified_pct: number;
+  active_returns: number;
+}
+
+export interface RevenueTrendPoint {
+  month: string;
+  revenue: number;
+  orders: number;
+}
+
+export interface TopCustomer {
+  partner_id: number;
+  name: string;
+  order_count: number;
+  total_spend: number;
+  verification_status: string;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: 'rfq' | 'company' | 'return';
+  title: string;
+  description: string;
+  status: string;
+  date: string;
+}
+
+export interface AdminAnalyticsData {
+  active_range_label?: string;
+  preset?: string;
+  kpis: AdminAnalyticsKPIs;
+  order_breakdown: {
+    draft: number;
+    sent: number;
+    sale: number;
+    done: number;
+    cancel: number;
+    total: number;
+  };
+  company_breakdown: {
+    total: number;
+    verified: number;
+    pending: number;
+    rejected: number;
+    verified_pct: number;
+  };
+  revenue_trend: RevenueTrendPoint[];
+  top_customers: TopCustomer[];
+  recent_activity: ActivityItem[];
+  error?: string;
+}
+
 // Admin-only view of a confirmed order, as returned by GET /api/rfq?state=sale
 // for the admin console's Order Tracking & Shipping tab.
 export interface AdminOrder extends RFQItem {

@@ -16,28 +16,59 @@ function matchesSearch(p: { name: string; description_sale: string }, search: st
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const search = searchParams.get('search') || '';
+  const category = searchParams.get('category') || undefined;
+  const sort = searchParams.get('sort') || undefined;
+  const limitParam = searchParams.get('limit');
+  const offsetParam = searchParams.get('offset');
+  const minPriceParam = searchParams.get('min_price');
+  const maxPriceParam = searchParams.get('max_price');
+
+  const limit = limitParam !== null ? Number(limitParam) : undefined;
+  const offset = offsetParam !== null ? Number(offsetParam) : undefined;
+  const min_price = minPriceParam !== null ? Number(minPriceParam) : undefined;
+  const max_price = maxPriceParam !== null ? Number(maxPriceParam) : undefined;
 
   if (USE_MOCK_CATALOG) {
-    return NextResponse.json(MOCK_PRODUCTS.filter((p) => matchesSearch(p, search)));
+    const filteredMock = MOCK_PRODUCTS.filter((p) => matchesSearch(p, search));
+    if (limit !== undefined) {
+      const start = offset || 0;
+      const sliced = filteredMock.slice(start, start + limit);
+      return NextResponse.json({
+        products: sliced,
+        total: filteredMock.length,
+        limit,
+        offset: start,
+        has_more: start + sliced.length < filteredMock.length,
+      });
+    }
+    return NextResponse.json(filteredMock);
   }
 
-  let odooProducts: Product[] = [];
   try {
-    odooProducts = (await odooClient.getProducts(search)) ?? [];
+    const res = await odooClient.getProducts({
+      search,
+      category,
+      sort,
+      limit,
+      offset,
+      min_price,
+      max_price,
+    });
+    return NextResponse.json(res);
   } catch (error) {
-    // Odoo unreachable — don't hard-fail the whole catalog page, fall
-    // through and serve whatever the mock catalog has instead.
     console.error('Odoo connection failed while fetching products, continuing with mock catalog:', error);
+    const mockProducts = (MOCK_PRODUCTS as Product[]).filter((p) => matchesSearch(p, search));
+    if (limit !== undefined) {
+      const start = offset || 0;
+      const sliced = mockProducts.slice(start, start + limit);
+      return NextResponse.json({
+        products: sliced,
+        total: mockProducts.length,
+        limit,
+        offset: start,
+        has_more: start + sliced.length < mockProducts.length,
+      });
+    }
+    return NextResponse.json(mockProducts);
   }
-
-  // Mock products live in the 900000+ id range (see constants.ts) so they
-  // can never collide with real Odoo-assigned ids — safe to blend the two
-  // lists together. Real Odoo products come first; mock products matching
-  // the same search term fill out the rest, so the catalog is never empty
-  // just because nothing has been published in Odoo yet.
-  const mockProducts = (MOCK_PRODUCTS as Product[]).filter((p) => matchesSearch(p, search));
-  const odooIds = new Set(odooProducts.map((p) => p.id));
-  const combined = [...odooProducts, ...mockProducts.filter((p) => !odooIds.has(p.id))];
-
-  return NextResponse.json(combined);
 } 

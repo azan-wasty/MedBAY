@@ -23,6 +23,7 @@ import { Reveal, EASE_OUT } from "@/components/shared/Reveal";
 import { PulseLine } from "@/components/shared/PulseLine";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
+import { AntidoteVial } from "@/components/home/AntidoteVial";
 
 const heroProduct = MOCK_PRODUCTS[0];
 const ROTATION_INTERVAL_MS = 3500;
@@ -116,8 +117,25 @@ export default function Hero() {
           </Reveal>
         </div>
 
-        {/* Visual column — Single-Slot Rotator or Static Fallback */}
-        <div className="relative mx-auto w-full max-w-md lg:mx-0 lg:max-w-none">
+        {/* Visual column — interactive particle antidote capsule */}
+        <div className="relative mx-auto aspect-square w-full max-w-md lg:mx-0 lg:max-w-none">
+          <Reveal delay={0.18} y={26} className="h-full w-full">
+            <AntidoteVial className="h-full w-full" />
+          </Reveal>
+        </div>
+      </Container>
+
+      {/* Featured product — centered below the primary hero row, with a
+          single lifeline drawn behind it (see HeroSingleSlotRotator /
+          HeroStaticFallback, which no longer render their own). */}
+      <Container className="mt-16 sm:mt-20 lg:mt-24">
+        <div className="relative mx-auto w-full max-w-md">
+          <PulseLine
+            width={360}
+            strokeWidth={2}
+            delay={0.3}
+            className="pointer-events-none absolute left-1/2 top-1/2 -z-10 hidden -translate-x-1/2 -translate-y-1/2 opacity-[0.15] sm:block"
+          />
           {loading ? (
             <HeroLoadingSkeleton />
           ) : featuredProducts.length > 0 ? (
@@ -188,13 +206,6 @@ function HeroSingleSlotRotator({
 
   return (
     <div className="relative">
-      <PulseLine
-        width={260}
-        strokeWidth={2}
-        delay={0.6}
-        className="absolute -left-6 -top-10 hidden opacity-70 sm:block"
-      />
-
       {/* Top Rotator Header Bar */}
       <div className="mb-3.5 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
@@ -303,9 +314,9 @@ function HeroSingleSlotRotator({
                 <span className="font-data text-[15px] font-semibold text-ink-900">
                   {currentProduct.list_price > 0
                     ? `$${currentProduct.list_price.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
                     : "Contact Sales"}
                 </span>
               </div>
@@ -355,11 +366,10 @@ function HeroSingleSlotRotator({
               type="button"
               onClick={() => setActiveIndex(idx)}
               aria-label={`Go to featured product ${idx + 1}`}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                idx === activeIndex
+              className={`h-2 rounded-full transition-all duration-300 ${idx === activeIndex
                   ? "w-6 bg-brand-600"
                   : "w-2 bg-ink-200 hover:bg-ink-400"
-              }`}
+                }`}
             />
           ))}
         </div>
@@ -376,12 +386,6 @@ function HeroStaticFallback({ shouldReduceMotion }: { shouldReduceMotion: boolea
   return (
     <Reveal delay={0.18} y={26}>
       <div className="relative">
-        <PulseLine
-          width={260}
-          strokeWidth={2}
-          delay={0.6}
-          className="absolute -left-6 -top-10 hidden opacity-70 sm:block"
-        />
         <motion.div
           style={{ "--tilt": "1.4deg" } as React.CSSProperties}
           animate={shouldReduceMotion ? undefined : { translateY: [0, -10, 0] }}

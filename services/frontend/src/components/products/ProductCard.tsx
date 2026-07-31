@@ -44,7 +44,7 @@ export const ProductCard = React.memo(function ProductCard({
       viewport={{ once: true, margin: "-40px" }}
       whileHover={{ y: -6 }}
       transition={{ type: "spring", stiffness: 300, damping: 22 }}
-      className="group flex h-full flex-col overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-sm transition-shadow duration-300 hover:border-brand-200 hover:shadow-soft-lg"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-md transition-all duration-300 hover:border-brand-300 hover:shadow-soft-xl"
     >
       <Link href={`/products/${product.id}`} className="relative block aspect-[4/3] overflow-hidden bg-ink-50">
         {imageSrc ? (
@@ -62,10 +62,10 @@ export const ProductCard = React.memo(function ProductCard({
           </div>
         )}
 
-        <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+        <div className="absolute left-3.5 top-3.5 right-3.5 flex items-start justify-between gap-2">
           {product.has_vendor_company ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white/95 px-2.5 py-1 text-[10.5px] font-semibold text-brand-700 shadow-soft-xs backdrop-blur-sm">
-              <ShieldCheck className="h-3 w-3" />
+              <ShieldCheck className="h-3 w-3 text-brand-600" />
               Verified
             </span>
           ) : (
@@ -78,7 +78,7 @@ export const ProductCard = React.memo(function ProductCard({
       </Link>
 
       <div className="flex flex-1 flex-col p-5">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">
           {categoryName || "Equipment"}
         </span>
 
@@ -120,25 +120,34 @@ export const ProductCard = React.memo(function ProductCard({
           </div>
         )}
 
-        <div className="mt-4 flex gap-2 pt-1">
-          <Button asChild variant="outline" size="sm" className="flex-1">
-            <Link href={`/products/${product.id}`}>{CATALOG_LABELS.viewDetails}</Link>
-          </Button>
-          {isOutOfStock ? (
-            <Button
-              disabled
-              size="sm"
-              variant="outline"
-              title={CATALOG_LABELS.outOfStockTooltip}
-              className="flex-1 cursor-not-allowed border-ink-200 bg-ink-50 text-ink-400 hover:bg-ink-50 hover:text-ink-400"
-            >
-              {CATALOG_LABELS.outOfStockLabel}
+        <div className="mt-auto pt-3.5">
+          <div className="flex items-center gap-2 border-t border-ink-100/70 pt-3">
+            <Button asChild variant="outline" size="sm" className="h-9 flex-1 rounded-lg border-ink-200 px-2.5 text-[12.5px] font-semibold text-ink-700 hover:border-brand-300 hover:bg-brand-50/50 hover:text-brand-700">
+              <Link href={`/products/${product.id}`} className="truncate">
+                {CATALOG_LABELS.viewDetails}
+              </Link>
             </Button>
-          ) : (
-            <Button size="sm" variant="brand" className="flex-1" onClick={(e) => onAddToCart(product, e)}>
-              {hasVariants ? "Select Options" : CATALOG_LABELS.addToCart}
-            </Button>
-          )}
+            {isOutOfStock ? (
+              <Button
+                disabled
+                size="sm"
+                variant="outline"
+                title={CATALOG_LABELS.outOfStockTooltip}
+                className="h-9 flex-1 cursor-not-allowed rounded-lg border-ink-200 bg-ink-50 px-2.5 text-[12.5px] font-semibold text-ink-400"
+              >
+                {CATALOG_LABELS.outOfStockLabel}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="brand"
+                className="h-9 flex-1 rounded-lg px-2.5 text-[12.5px] font-semibold shadow-soft-xs active:scale-[0.98]"
+                onClick={(e) => onAddToCart(product, e)}
+              >
+                <span className="truncate">{CATALOG_LABELS.addToCart}</span>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -147,7 +156,7 @@ export const ProductCard = React.memo(function ProductCard({
 
 export function ProductCardSkeleton() {
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-ink-100 bg-white shadow-soft-sm">
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-sm">
       <div className="skeleton-shimmer aspect-[4/3] w-full" />
       <div className="flex flex-1 flex-col gap-2.5 p-5">
         <div className="skeleton-shimmer h-2.5 w-1/3 rounded" />

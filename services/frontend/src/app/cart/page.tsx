@@ -11,6 +11,9 @@ import { CART_LABELS, AUTH_LABELS } from '@/lib/constants';
 import { Container } from '@/components/shared/Container';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter,
+} from '@/components/ui/dialog';
 
 interface CartItem {
   id: number;
@@ -37,6 +40,7 @@ export default function CartPage() {
   const [submittedRfq, setSubmittedRfq] = useState<{ id?: number; name?: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [buyerNotes, setBuyerNotes] = useState<string>('');
+  const [showUnverifiedModal, setShowUnverifiedModal] = useState<boolean>(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('med_user');
@@ -118,6 +122,11 @@ export default function CartPage() {
 
       const data = await res.json();
 
+      if (res.status === 403) {
+        setShowUnverifiedModal(true);
+        return;
+      }
+
       if (res.status === 401) {
         setIsLoggedIn(false);
         localStorage.removeItem('med_user');
@@ -180,6 +189,7 @@ export default function CartPage() {
   const orgName = isLoggedIn ? JSON.parse(localStorage.getItem('med_user') || '{}').name : 'Not Signed In';
 
   return (
+    <>
     <div className="bg-ink-50/40 py-10 sm:py-14">
       <Container>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl">
@@ -387,5 +397,25 @@ export default function CartPage() {
         )}
       </Container>
     </div>
+
+    {/* Verification gating modal — shown when unverified company tries to submit */}
+    <Dialog open={showUnverifiedModal} onOpenChange={(open) => !open && setShowUnverifiedModal(false)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Account Verification Required</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <p className="text-sm leading-relaxed text-ink-600">
+            Your company is currently <strong className="text-amber-700">unverified</strong>. You cannot submit a quote until an administrator verifies your account. Please wait for verification — you&apos;ll be notified once your company is approved.
+          </p>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="brand" onClick={() => setShowUnverifiedModal(false)} className="w-full">
+            Got it
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }

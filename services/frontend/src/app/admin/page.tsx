@@ -16,6 +16,7 @@ import {
 } from '@/lib/constants';
 import type { CompanyPartner, AdminReturnRequest, RFQItem, Carrier, User, AdminOrder } from '@/lib/odooClient';
 import { Container } from '@/components/shared/Container';
+import { formatDisplayName } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
@@ -348,7 +349,7 @@ export default function AdminPage() {
       setSelectedOrderForTracking(null);
       setTrackingCarrierId('');
       setTrackingReference('');
-      setRefreshSignal((s) => s + 1);
+      loadOrders();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to update tracking.');
     } finally {
@@ -435,20 +436,20 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="bg-ink-50/40 py-10 sm:py-14">
+    <div className="min-h-screen overflow-y-auto bg-ink-50/40 py-10 sm:py-14">
       <Container>
         <div className="mb-8">
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl">
             Marketplace Admin Console
           </h1>
           <p className="mt-1 text-sm text-ink-500">
-            Manage buyer registrations, handle customer return requests, and track shipping operations.
+            Manage buyer registrations, analyze platform sales, handle customer return requests, and track shipping operations.
           </p>
         </div>
 
         <AdminOverview refreshSignal={refreshSignal} onNavigate={handleOverviewNavigate} />
 
-        <div id="admin-tabs" className="scroll-mt-20">
+        <div id="admin-tabs" className="sticky top-0 z-20 scroll-mt-20 border-b border-ink-100 bg-ink-50/90 py-3 backdrop-blur-md">
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <div className="overflow-x-auto pb-1">
               <TabsList>

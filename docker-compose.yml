@@ -38,7 +38,7 @@ services:
     command: >-
       /bin/bash -c "
       python3 -c \"import os; conf = open('/etc/odoo/odoo.conf').read(); conf = conf.replace('admin_passwd = changeme', 'admin_passwd = ' + os.getenv('ODOO_ADMIN_PASSWORD', '')); open('/tmp/odoo.conf', 'w').write(conf)\" &&
-      exec odoo -c /tmp/odoo.conf --db_host=odoo-db --db_port=${POSTGRES_PORT} -r ${POSTGRES_USER} -w ${POSTGRES_PASSWORD} -u medical_marketplace -d odoo
+      exec odoo -c /tmp/odoo.conf --db_host=odoo-db --db_port=${POSTGRES_PORT} -r ${POSTGRES_USER} -w ${POSTGRES_PASSWORD} -u medical_marketplace -d odoo --dev=all
       "
 
   frontend:

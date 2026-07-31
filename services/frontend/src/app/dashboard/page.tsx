@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Info,
   Bell,
+  Trash2,
 } from 'lucide-react';
 
 import {
@@ -87,6 +88,7 @@ export default function DashboardPage() {
   const [reviewSuccess, setReviewSuccess] = useState('');
 
   // Negotiation states
+  const [rfqToApprove, setRfqToApprove] = useState<RFQDetail | null>(null);
   const [rfqToReject, setRfqToReject] = useState<RFQDetail | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
   const [rejecting, setRejecting] = useState(false);
@@ -436,10 +438,22 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-2 rounded-lg border border-ink-100 bg-white px-3.5 py-2">
             <span className="text-xs font-medium text-ink-500">Status:</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-              <ShieldCheck className="h-3 w-3" />
-              {DASHBOARD_LABELS.statusVerified}
-            </span>
+            {user?.verification_status === 'verified' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                <ShieldCheck className="h-3 w-3" />
+                {DASHBOARD_LABELS.statusVerified}
+              </span>
+            ) : user?.verification_status === 'rejected' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700">
+                <Info className="h-3 w-3" />
+                Rejected
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 animate-pulse">
+                <Info className="h-3 w-3" />
+                Pending Verification
+              </span>
+            )}
           </div>
         </div>
 
@@ -462,6 +476,25 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {user && user.verification_status !== 'verified' && (
+          <div className={`mb-6 rounded-xl border p-4 text-sm leading-relaxed shadow-soft-xs ${
+            user.verification_status === 'rejected'
+              ? 'border-red-200 bg-red-50/80 text-red-900'
+              : 'border-amber-200 bg-amber-50/80 text-amber-900'
+          }`}>
+            <p className="font-semibold">
+              {user.verification_status === 'rejected'
+                ? 'Verification Rejected'
+                : 'Account Pending Verification'}
+            </p>
+            <p className="mt-0.5 text-[13px]">
+              {user.verification_status === 'rejected'
+                ? 'Your company verification was rejected. Please contact an administrator for more information.'
+                : 'Your company is currently unverified. You cannot submit quotes until an administrator approves your account. You\u2019ll be notified by email once approved.'}
+            </p>
           </div>
         )}
 
