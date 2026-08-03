@@ -51,10 +51,10 @@ export default function FeaturedCatalog() {
   const [totalItems, setTotalItems] = React.useState<number>(0);
   const [page, setPage] = React.useState<number>(1);
   const [hasMore, setHasMore] = React.useState<boolean>(true);
-  
+
   const [loading, setLoading] = React.useState<boolean>(true);
   const [isFetchingNextPage, setIsFetchingNextPage] = React.useState<boolean>(false);
-  
+
   const [searchTerm, setSearchTerm] = React.useState<string>("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = React.useState<string>("");
   const [toastMessage, setToastMessage] = React.useState<string>("");
@@ -230,8 +230,8 @@ export default function FeaturedCatalog() {
         v >= 1000000
           ? `$${(v / 1000000).toFixed(1)}M`
           : v >= 1000
-          ? `$${(v / 1000).toFixed(0)}k`
-          : `$${v}`;
+            ? `$${(v / 1000).toFixed(0)}k`
+            : `$${v}`;
       chips.push({
         id: "price-range",
         label: `${fmt(lo)} – ${hi >= priceMax ? "Any" : fmt(hi)}`,
@@ -256,8 +256,8 @@ export default function FeaturedCatalog() {
         a === "in_stock"
           ? "In Stock"
           : a === "low_stock"
-          ? "Low Stock"
-          : "Out of Stock";
+            ? "Low Stock"
+            : "Out of Stock";
       chips.push({
         id: `avail-${a}`,
         label,
@@ -281,6 +281,33 @@ export default function FeaturedCatalog() {
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (product.attribute_line_ids && product.attribute_line_ids.length > 0) {
+      window.location.href = `/products/${product.id}`;
+      return;
+    }
+
+    const storedCart = localStorage.getItem("med_cart");
+    let cart: { id: number; name: string; quantity: number; price: number }[] = [];
+
+    if (storedCart) {
+      try { cart = JSON.parse(storedCart); } catch { cart = []; }
+    }
+
+    const existingItem = cart.find((item) => item.id === product.id);
+    if (existingItem) {
+      existingItem.quantity += 1;
+    } else {
+      cart.push({
+        id: product.id,
+        name: product.name,
+        quantity: Math.max(1, product.min_order_qty || 1),
+        price: product.list_price,
+      });
+    }
+
+    localStorage.setItem("med_cart", JSON.stringify(cart));
+    window.dispatchEvent(new Event("cart-updated"));
     setToastMessage(`${product.name} ${CATALOG_LABELS.addedToCart}!`);
     setTimeout(() => setToastMessage(""), 3000);
   };
@@ -407,7 +434,7 @@ export default function FeaturedCatalog() {
                   {/* End of catalog indicator */}
                   {!hasMore && products.length > 0 && (
                     <div className="mt-12 text-center text-xs font-medium text-ink-400">
-                      You've viewed all {totalItems || products.length} products in our catalog
+                      You&apos;ve viewed all {totalItems || products.length} products in our catalog
                     </div>
                   )}
                 </>

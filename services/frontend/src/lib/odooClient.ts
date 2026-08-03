@@ -688,6 +688,27 @@ export const odooClient = {
     });
   },
 
+  async adminGetRfqDetail(id: number | string, sessionId: string) {
+    return this.request(`/api/admin/rfq/${id}`, {
+      method: 'GET',
+      headers: { Cookie: `session_id=${sessionId}` },
+      cache: 'no-store',
+    });
+  },
+
+  async adminSendQuote(
+    id: number | string,
+    lines: { line_id: number; price_unit: number }[],
+    sessionId: string
+  ) {
+    return this.request(`/api/admin/rfq/${id}/quote`, {
+      method: 'POST',
+      headers: { Cookie: `session_id=${sessionId}` },
+      body: JSON.stringify({ lines }),
+      cache: 'no-store',
+    });
+  },
+
   // --- Admin: Order Tracking ---
 
   async adminSetOrderTracking(orderId: number, carrierId: number, trackingReference: string, sessionId: string) {

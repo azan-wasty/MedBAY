@@ -174,7 +174,8 @@ class MedicalReturnRequest(models.Model):
             else:
                 line.quantity = 0.0
         result = wizard._create_returns()
-        return_picking = self.env['stock.picking'].browse(result.get('res_id'))
+        new_picking_id = result[0] if isinstance(result, (tuple, list)) else result.get('res_id')
+        return_picking = self.env['stock.picking'].browse(new_picking_id)
         if not return_picking:
             raise UserError(_('Failed to create the return picking.'))
         return_picking.action_confirm()

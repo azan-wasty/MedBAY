@@ -111,7 +111,39 @@ export const ODOO_STATUS_MAP: Record<string, { label: string; bg: string; text: 
   done: { label: "Completed", bg: "#e0f2fe", text: "#075985" },
   cancel: { label: "Rejected by Buyer", bg: "#fee2e2", text: "#991b1b" },
 };
+// Tailwind-class-based status styling for the admin dashboard's "Recent Activity"
+// feed, which mixes rfq/company/return activity items under one status badge.
+export const QUOTATION_STATE_STYLES: Record<string, string> = {
+  draft: "bg-amber-50 text-amber-800",
+  sent: "bg-blue-50 text-blue-700",
+  sale: "bg-emerald-50 text-emerald-700",
+  done: "bg-sky-50 text-sky-700",
+  cancel: "bg-red-50 text-red-700",
+  pending: "bg-amber-50 text-amber-800",
+  verified: "bg-emerald-50 text-emerald-700",
+  rejected: "bg-red-50 text-red-700",
+  requested: "bg-amber-50 text-amber-800",
+  approved: "bg-blue-50 text-blue-700",
+  refunded: "bg-emerald-50 text-emerald-700",
+  replaced: "bg-emerald-50 text-emerald-700",
+  cancelled: "bg-ink-50 text-ink-600",
+};
 
+export const QUOTATION_STATE_LABELS: Record<string, string> = {
+  draft: "Draft",
+  sent: "Quoted",
+  sale: "Confirmed",
+  done: "Completed",
+  cancel: "Cancelled",
+  pending: "Pending",
+  verified: "Verified",
+  rejected: "Rejected",
+  requested: "Requested",
+  approved: "Approved",
+  refunded: "Refunded",
+  replaced: "Replaced",
+  cancelled: "Cancelled",
+};
 export const RFQ_NEGOTIATION_LABELS = {
   approveBtn: "Approve & Order",
   counterBtn: "Counter Offer",

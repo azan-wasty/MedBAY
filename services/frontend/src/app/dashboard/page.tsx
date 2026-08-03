@@ -88,7 +88,6 @@ export default function DashboardPage() {
   const [reviewSuccess, setReviewSuccess] = useState('');
 
   // Negotiation states
-  const [rfqToApprove, setRfqToApprove] = useState<RFQDetail | null>(null);
   const [rfqToReject, setRfqToReject] = useState<RFQDetail | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
   const [rejecting, setRejecting] = useState(false);
@@ -480,11 +479,10 @@ export default function DashboardPage() {
         )}
 
         {user && user.verification_status !== 'verified' && (
-          <div className={`mb-6 rounded-xl border p-4 text-sm leading-relaxed shadow-soft-xs ${
-            user.verification_status === 'rejected'
+          <div className={`mb-6 rounded-xl border p-4 text-sm leading-relaxed shadow-soft-xs ${user.verification_status === 'rejected'
               ? 'border-red-200 bg-red-50/80 text-red-900'
               : 'border-amber-200 bg-amber-50/80 text-amber-900'
-          }`}>
+            }`}>
             <p className="font-semibold">
               {user.verification_status === 'rejected'
                 ? 'Verification Rejected'

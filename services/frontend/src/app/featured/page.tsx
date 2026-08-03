@@ -3,11 +3,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, ArrowLeft, CheckCircle2, LayoutGrid, Loader2 } from 'lucide-react';
+import { Sparkles, CheckCircle2, LayoutGrid, Loader2 } from 'lucide-react';
 
 import type { Product, PaginatedProductsResponse } from '@/lib/odooClient';
 import { CATALOG_LABELS } from '@/lib/constants';
 import { Container } from '@/components/shared/Container';
+import { SectionHeading } from '@/components/shared/SectionHeading';
 import { ProductCard, ProductCardSkeleton } from '@/components/products/ProductCard';
 
 const BATCH_SIZE = 20;
@@ -102,158 +103,6 @@ export default function FeaturedProductsPage() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [hasMore, loading, isFetchingNextPage, products.length, fetchFeaturedBatch]);
-
-  // Allow homepage CategoriesGrid to pre-select a category
-  React.useEffect(() => {
-    const onSetCategory = (e: Event) => {
-      const detail = (e as CustomEvent<string>).detail;
-      if (typeof detail === "string") {
-        setFilters((prev) => ({ ...prev, category: detail }));
-      }
-    };
-    window.addEventListener("catalog:set-category", onSetCategory);
-    return () => window.removeEventListener("catalog:set-category", onSetCategory);
-  }, []);
-
-  // ── Filter + sort logic ─────────────────────────────────────────────────
-  const { displayProducts } = React.useMemo(() => {
-    let result = products;
-
-    // Search
-    if (debouncedSearchTerm.trim()) {
-      const q = debouncedSearchTerm.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          (p.description_sale && p.description_sale.toLowerCase().includes(q))
-      );
-    }
-
-    // Category
-    if (filters.category) {
-      result = result.filter((p) => getProductCategory(p) === filters.category);
-    }
-
-    // Price range
-    const [lo, hi] = filters.priceRange;
-    if (lo > priceMin || hi < priceMax) {
-      result = result.filter((p) => p.list_price >= lo && p.list_price <= hi);
-    }
-
-    // Vendors (OR within section)
-    if (filters.vendors.length > 0) {
-      result = result.filter((p) =>
-        filters.vendors.includes(getProductVendorName(p))
-      );
-    }
-
-    // Availability (OR within section)
-    if (filters.availability.length > 0) {
-      result = result.filter(
-        (p) => p.stock_status && filters.availability.includes(p.stock_status)
-      );
-    }
-
-    const sorted = sortProducts(result, filters.sort);
-    return { displayProducts: sorted };
-  }, [products, debouncedSearchTerm, filters, priceMin, priceMax]);
-
-  // Snap the product panel back to its top whenever the result set changes
-  // (new search or filter) so newly-matched items are immediately visible,
-  // without affecting the scroll position of the header/sidebar around it.
-  React.useEffect(() => {
-    productPanelRef.current?.scrollTo({ top: 0, behavior: "auto" });
-  }, [debouncedSearchTerm, filters]);
-
-  // ── Filter state helpers ────────────────────────────────────────────────
-  const updateFilter = React.useCallback(
-    <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
-      setFilters((prev) => ({ ...prev, [key]: value }));
-    },
-    [] // setFilters is stable, no deps needed
-  );
-
-  const clearAllFilters = React.useCallback(() => {
-    setFilters(makeDefaultFilters(priceMin, priceMax));
-    setSearchTerm("");
-  }, [priceMin, priceMax]);
-
-  // ── Active chip computation ─────────────────────────────────────────────
-  const activeChips = React.useMemo<ActiveChip[]>(() => {
-    const chips: ActiveChip[] = [];
-
-    if (filters.category) {
-      chips.push({
-        id: `cat-${filters.category}`,
-        label: filters.category,
-        onRemove: () => updateFilter("category", ""),
-      });
-    }
-
-    const [lo, hi] = filters.priceRange;
-    if (lo > priceMin || hi < priceMax) {
-      const fmt = (v: number) =>
-        v >= 1000000
-          ? `$${(v / 1000000).toFixed(1)}M`
-          : v >= 1000
-            ? `$${(v / 1000).toFixed(0)}k`
-            : `$${v}`;
-      chips.push({
-        id: "price-range",
-        label: `${fmt(lo)} – ${hi >= priceMax ? "Any" : fmt(hi)}`,
-        onRemove: () => updateFilter("priceRange", [priceMin, priceMax]),
-      });
-    }
-
-    filters.vendors.forEach((v) =>
-      chips.push({
-        id: `vendor-${v}`,
-        label: v,
-        onRemove: () =>
-          updateFilter(
-            "vendors",
-            filters.vendors.filter((x) => x !== v)
-          ),
-      })
-    );
-
-    filters.availability.forEach((a) => {
-      const label =
-        a === "in_stock"
-          ? FILTER_LABELS.stockInStock
-          : a === "low_stock"
-            ? FILTER_LABELS.stockLowStock
-            : FILTER_LABELS.stockOutOfStock;
-      chips.push({
-        id: `avail-${a}`,
-        label,
-        onRemove: () =>
-          updateFilter(
-            "availability",
-            filters.availability.filter((x) => x !== a)
-          ),
-      });
-    });
-
-    if (filters.sort !== "default") {
-      const sortLabel =
-        {
-          price_asc: "Price: Low→High", price_desc: "Price: High→Low",
-          name_asc: "Name: A→Z", name_desc: "Name: Z→A", newest: "Newest"
-        }[
-        filters.sort
-        ] ?? filters.sort;
-      chips.push({
-        id: `sort-${filters.sort}`,
-        label: `Sort: ${sortLabel}`,
-        onRemove: () => updateFilter("sort", "default"),
-      });
-    }
-
-    return chips;
-  }, [filters, priceMin, priceMax, updateFilter]);
-
-  const activeFilterCount = activeChips.length;
 
   // ── Cart handler ────────────────────────────────────────────────────────
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
@@ -360,7 +209,7 @@ export default function FeaturedProductsPage() {
               {/* End of catalog notice */}
               {!hasMore && products.length > 0 && (
                 <div className="mt-12 text-center text-xs font-medium text-ink-400">
-                  You've viewed all {totalItems || products.length} products in our catalog
+                  You&apos;ve viewed all {totalItems || products.length} products in our catalog
                 </div>
               )}
             </>
@@ -384,6 +233,6 @@ export default function FeaturedProductsPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </section>
+    </div>
   );
 }
