@@ -156,11 +156,12 @@ export default function AdminPage() {
     try {
       setOrdersLoading(true);
       setErrorMsg('');
-      const res = await fetch(`/api/rfq?state=sale`, { cache: 'no-store' });
+      // Use the admin-scoped endpoint so we see ALL buyers' confirmed orders,
+      // not just the currently-logged-in user's orders.
+      const res = await fetch(`/api/admin/rfq?state=sale`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load orders');
-      const confirmedOrders = Array.isArray(data) ? data.filter((o: any) => o.state === 'sale') : [];
-      setOrders(confirmedOrders);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setErrorMsg(err.message || 'Unable to load confirmed orders.');
     } finally {
