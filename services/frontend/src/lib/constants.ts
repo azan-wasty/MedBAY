@@ -366,11 +366,12 @@ export const TRUST_STATS = [
 // components/home/CategoriesGrid.tsx. Categories mirror the taxonomy already
 // present in MOCK_PRODUCTS below.
 export const CATEGORY_SHOWCASE = [
-  { name: "Diagnostic Imaging", icon: "ScanLine", description: "MRI, CT, ultrasound & X-ray systems from certified manufacturers." },
-  { name: "Life Support", icon: "HeartPulse", description: "Ventilators, defibrillators & critical care monitoring equipment." },
-  { name: "Operating Room", icon: "Syringe", description: "Surgical lighting, instruments & OR-grade equipment." },
-  { name: "Sterilization", icon: "FlaskConical", description: "Autoclaves and sterile processing systems for compliant facilities." },
-  { name: "PPE & Consumables", icon: "Boxes", description: "Bulk gloves, masks, and single-use clinical consumables." },
+  { name: "Diagnostic Equipment", icon: "Activity", description: "Stethoscopes, BP monitors, thermometers & blood oximeters." },
+  { name: "Hospital Furniture", icon: "BedDouble", description: "Hydraulic tables, electric beds, wheelchairs & IV stands." },
+  { name: "PPE & Consumables", icon: "Boxes", description: "Bulk nitrile gloves, surgical masks, syringes & sanitizers." },
+  { name: "Surgical Instruments", icon: "Syringe", description: "Scalpels, forceps, needle holders & surgical kits." },
+  { name: "Imaging & Lab Equipment", icon: "ScanLine", description: "Ultrasound machines, centrifuges, microscopes & analyzers." },
+  { name: "Home Care Equipment", icon: "HeartPulse", description: "Nebulizers, walkers, oxygen concentrators & rollators." },
 ];
 
 export const BENEFITS_CONTENT = [
@@ -506,7 +507,7 @@ export const MOCK_PRODUCTS = [
     name: "AuraScan MRI Machine - 3T",
     list_price: 1250000.0,
     description_sale: "State-of-the-art 3 Tesla MRI scanner offering high-resolution clinical imaging with advanced noise-canceling technology.",
-    categ_id: [10, "Diagnostic Imaging"],
+    categ_id: [10, "Imaging & Lab Equipment"],
     certification_info: "FDA Approved, CE Certified, ISO 13485",
     unit_of_measure: "Unit",
     min_order_qty: 1,
@@ -526,7 +527,7 @@ export const MOCK_PRODUCTS = [
     name: "Medisurge ICU Ventilator - V2",
     list_price: 45000.0,
     description_sale: "Critical care ventilator suitable for pediatric and adult patients. Supports invasive and non-invasive ventilation modes.",
-    categ_id: [11, "Life Support"],
+    categ_id: [11, "Home Care Equipment"],
     certification_info: "FDA Approved, CE Certified",
     unit_of_measure: "Unit",
     min_order_qty: 2,
@@ -547,7 +548,7 @@ export const MOCK_PRODUCTS = [
     name: "SurgiPath Surgical Lighting System",
     list_price: 12500.0,
     description_sale: "High-intensity LED surgical light head with customizable light diameter and color temperature adjustments.",
-    categ_id: [12, "Operating Room"],
+    categ_id: [12, "Surgical Instruments"],
     certification_info: "CE Certified, UL 60601-1",
     unit_of_measure: "Set",
     min_order_qty: 1,
@@ -565,7 +566,7 @@ export const MOCK_PRODUCTS = [
     name: "HeartSync Defibrillator - Pro",
     list_price: 7800.0,
     description_sale: "Biphasic automated external defibrillator (AED) and manual monitor with pacing, SpO2, and ECG display.",
-    categ_id: [11, "Life Support"],
+    categ_id: [11, "Home Care Equipment"],
     certification_info: "FDA Approved, AHA Compliant",
     unit_of_measure: "Unit",
     min_order_qty: 5,
@@ -583,7 +584,7 @@ export const MOCK_PRODUCTS = [
     name: "SterilMax Autoclave Sterilizer",
     list_price: 18500.0,
     description_sale: "Class B steam sterilizer with vacuum pump and built-in micro-printer for sterilization cycles logging.",
-    categ_id: [13, "Sterilization"],
+    categ_id: [13, "Diagnostic Equipment"],
     certification_info: "EN 13060 Standard, CE Certified",
     unit_of_measure: "Unit",
     min_order_qty: 1,

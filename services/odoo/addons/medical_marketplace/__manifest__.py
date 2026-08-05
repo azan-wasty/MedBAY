@@ -15,6 +15,9 @@
     'data': [
         'security/marketplace_security.xml',   # must load before ir.model.access.csv
         'security/ir.model.access.csv',
+        'data/product_categories.xml',         # Marketplace categories
+        'data/vendor_partners.xml',            # Marketplace pre-verified suppliers
+        'data/medical_products.xml',           # Medical marketplace products seed catalog
         'data/return_sequence.xml',
         'data/return_reasons.xml',             # Feature 1: return reason categories
         'data/config_params.xml',              # Feature 1+5: confirmation msg, stage labels
@@ -25,6 +28,7 @@
         'views/return_views.xml',
         'views/carrier_views.xml',             # Feature 3+1: carrier + reason config menus
     ],
+    'post_init_hook': 'post_init_hook',
     'installable': True,
     'application': True,
 }

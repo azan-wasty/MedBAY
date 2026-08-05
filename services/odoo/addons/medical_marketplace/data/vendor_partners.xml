@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Medical Marketplace : Vendor / Supplier Partners
+    =================================================
+    Creates 6 pre-verified B2B supplier companies (one per product category).
+-->
+<odoo noupdate="1">
+
+    <!-- 1. DiagnoTech Instruments -->
+    <record id="vendor_diagnotech" model="res.partner">
+        <field name="name">DiagnoTech Instruments Ltd.</field>
+        <field name="is_company" eval="True"/>
+        <field name="email">procurement@diagnotech.com</field>
+        <field name="registration_number">DT-MED-20145</field>
+        <field name="verification_status">verified</field>
+        <field name="is_verified" eval="True"/>
+    </record>
+
+    <!-- 2. MedFurnish Solutions -->
+    <record id="vendor_medfurnish" model="res.partner">
+        <field name="name">MedFurnish Solutions Inc.</field>
+        <field name="is_company" eval="True"/>
+        <field name="email">sales@medfurnish.com</field>
+        <field name="registration_number">MF-HOSP-38921</field>
+        <field name="verification_status">verified</field>
+        <field name="is_verified" eval="True"/>
+    </record>
+
+    <!-- 3. MedGuard Supplies Ltd. -->
+    <record id="vendor_medguard" model="res.partner">
+        <field name="name">MedGuard Supplies Ltd.</field>
+        <field name="is_company" eval="True"/>
+        <field name="email">orders@medguard.com</field>
+        <field name="registration_number">MG-PPE-10733</field>
+        <field name="verification_status">verified</field>
+        <field name="is_verified" eval="True"/>
+    </record>
+
+    <!-- 4. SurgiPath Instruments -->
+    <record id="vendor_surgipath" model="res.partner">
+        <field name="name">SurgiPath Instruments</field>
+        <field name="is_company" eval="True"/>
+        <field name="email">info@surgipath.com</field>
+        <field name="registration_number">SP-SURG-55102</field>
+        <field name="verification_status">verified</field>
+        <field name="is_verified" eval="True"/>
+    </record>
+
+    <!-- 5. Aura Medical Systems -->
+    <record id="vendor_aura_medical" model="res.partner">
+        <field name="name">Aura Medical Systems</field>
+        <field name="is_company" eval="True"/>
+        <field name="email">b2b@auramedical.com</field>
+        <field name="registration_number">AM-LAB-98301</field>
+        <field name="verification_status">verified</field>
+        <field name="is_verified" eval="True"/>
+    </record>
+
+    <!-- 6. HomeCare Pro Devices -->
+    <record id="vendor_homecare_pro" model="res.partner">
+        <field name="name">HomeCare Pro Devices</field>
+        <field name="is_company" eval="True"/>
+        <field name="email">supply@homecarepro.com</field>
+        <field name="registration_number">HC-HOME-77654</field>
+        <field name="verification_status">verified</field>
+        <field name="is_verified" eval="True"/>
+    </record>
+
+</odoo>

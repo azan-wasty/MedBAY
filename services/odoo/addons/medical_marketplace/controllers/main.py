@@ -76,8 +76,17 @@ class MedicalMarketplaceController(http.Controller):
             or user.has_group('base.group_erp_manager')
         )
 
+    def _require_user(self):
+        """Returns a 401 response if the current session has no authenticated user."""
+        user = request.env.user
+        if not user or user._is_public() or not request.session.uid:
+            return self._json_response({'error': 'Unauthorized: login required'}, status=401)
+        return None
+
     def _require_admin(self):
-        """Returns a 403 response if the current user isn't a marketplace admin."""
+        """Returns 401 if unauthenticated, 403 if authenticated but not admin."""
+        if resp := self._require_user():
+            return resp
         if not self._is_admin():
             return self._json_response({'error': 'Forbidden: admin access required'}, status=403)
         return None
@@ -804,10 +813,13 @@ class MedicalMarketplaceController(http.Controller):
             if not login_val or not password:
                 return self._json_response({'error': 'Missing login or password'}, status=400)
 
-            uid = request.session.authenticate(ODOO_DB_NAME, login_val, password)
+            try:
+                uid = request.session.authenticate(ODOO_DB_NAME, login_val, password)
+            except Exception:
+                return self._json_response({'error': 'Invalid email or password'}, status=401)
 
             if not uid:
-                return self._json_response({'error': 'Invalid credentials'}, status=401)
+                return self._json_response({'error': 'Invalid email or password'}, status=401)
 
             user = request.env['res.users'].sudo().browse(uid)
             clean_name = user.name or ''
@@ -834,8 +846,10 @@ class MedicalMarketplaceController(http.Controller):
             _logger.exception("Login failed")
             return self._json_response({'error': str(e)}, status=500)
 
-    @http.route('/api/auth/whoami', type='http', auth='user', methods=['GET'], csrf=False)
+    @http.route('/api/auth/whoami', type='http', auth='public', methods=['GET'], csrf=False)
     def whoami(self, **kwargs):
+        if resp := self._require_user():
+            return resp
         user = request.env.user
         return self._json_response({
             'sid': request.session.sid,

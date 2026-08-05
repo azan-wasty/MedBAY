@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Medical Marketplace : Product Categories
+    =========================================
+    Creates / updates the 6 top-level product categories used by the
+    storefront. The category names here match exactly what the
+    Next.js frontend passes as ?category=<name> to GET /api/products.
+
+    noupdate="0" -> Odoo will re-apply these records on every
+    `odoo -u medical_marketplace`, keeping categories in sync.
+-->
+<odoo noupdate="0">
+
+    <!-- Category 1: Diagnostic Equipment -->
+    <record id="categ_diagnostic" model="product.category">
+        <field name="name">Diagnostic Equipment</field>
+    </record>
+
+    <!-- Category 2: Hospital Furniture -->
+    <record id="categ_hospital_furniture" model="product.category">
+        <field name="name">Hospital Furniture</field>
+    </record>
+
+    <!-- Category 3: PPE & Consumables -->
+    <record id="categ_ppe_consumables" model="product.category">
+        <field name="name">PPE &amp; Consumables</field>
+    </record>
+
+    <!-- Category 4: Surgical Instruments -->
+    <record id="categ_surgical" model="product.category">
+        <field name="name">Surgical Instruments</field>
+    </record>
+
+    <!-- Category 5: Imaging & Lab Equipment -->
+    <record id="categ_imaging_lab" model="product.category">
+        <field name="name">Imaging &amp; Lab Equipment</field>
+    </record>
+
+    <!-- Category 6: Home Care Equipment -->
+    <record id="categ_home_care" model="product.category">
+        <field name="name">Home Care Equipment</field>
+    </record>
+
+</odoo>

@@ -78,31 +78,7 @@ export default function FeaturedProductsPage() {
     fetchFeaturedBatch(0, false);
   }, [fetchFeaturedBatch]);
 
-  // Window Infinite Scroll Listener
-  useEffect(() => {
-    let ticking = false;
-
-    const handleScroll = () => {
-      if (ticking) return;
-      ticking = true;
-
-      window.requestAnimationFrame(() => {
-        ticking = false;
-        if (!hasMore || loading || isFetchingNextPage) return;
-
-        const scrollPosition = window.innerHeight + window.scrollY;
-        const scrollThreshold = document.documentElement.scrollHeight - SCROLL_THRESHOLD_PX;
-
-        if (scrollPosition >= scrollThreshold) {
-          const nextOffset = products.length;
-          fetchFeaturedBatch(nextOffset, true);
-        }
-      });
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMore, loading, isFetchingNextPage, products.length, fetchFeaturedBatch]);
+  // Manual / Scroll load handler for more products
 
   // ── Cart handler ────────────────────────────────────────────────────────
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
@@ -203,6 +179,20 @@ export default function FeaturedProductsPage() {
                       <ProductCardSkeleton key={`next-skel-${i}`} />
                     ))}
                   </div>
+                </div>
+              )}
+
+              {hasMore && !isFetchingNextPage && (
+                <div className="mt-8 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchFeaturedBatch(products.length, true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-5 py-2.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100 hover:text-brand-800"
+                  >
+                    Load More Equipment ({totalItems - products.length} remaining)
+                  </button>
                 </div>
               )}
 

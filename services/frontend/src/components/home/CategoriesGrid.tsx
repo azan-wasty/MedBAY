@@ -1,6 +1,6 @@
 "use client";
 
-import { ScanLine, HeartPulse, Syringe, FlaskConical, Boxes, ArrowRight, type LucideIcon } from "lucide-react";
+import { ScanLine, HeartPulse, Syringe, FlaskConical, Boxes, BedDouble, Activity, ArrowRight, type LucideIcon } from "lucide-react";
 
 import { CATEGORY_SHOWCASE } from "@/lib/constants";
 import { Container } from "@/components/shared/Container";
@@ -13,6 +13,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Syringe,
   FlaskConical,
   Boxes,
+  BedDouble,
+  Activity,
 };
 
 function selectCategory(name: string) {
@@ -31,7 +33,7 @@ export default function CategoriesGrid() {
           subtitle="From capital diagnostic imaging equipment to everyday consumables — browse verified inventory organized the way your procurement team already thinks."
         />
 
-        <Stagger className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <Stagger className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {CATEGORY_SHOWCASE.map((cat) => {
             const Icon = ICON_MAP[cat.icon] ?? Boxes;
             return (

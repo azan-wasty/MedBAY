@@ -161,32 +161,7 @@ export default function FeaturedCatalog() {
     loadProductBatch(0, false);
   }, [debouncedSearchTerm, filters]);
 
-  // Infinite Scroll Event Listener attached to Window
-  React.useEffect(() => {
-    let ticking = false;
-
-    const handleScroll = () => {
-      if (ticking) return;
-      ticking = true;
-
-      window.requestAnimationFrame(() => {
-        ticking = false;
-        if (!hasMore || loading || isFetchingNextPage) return;
-
-        const scrollPosition = window.innerHeight + window.scrollY;
-        const scrollThreshold = document.documentElement.scrollHeight - SCROLL_THRESHOLD_PX;
-
-        if (scrollPosition >= scrollThreshold) {
-          const nextOffset = products.length;
-          setPage((prev) => prev + 1);
-          loadProductBatch(nextOffset, true);
-        }
-      });
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [hasMore, loading, isFetchingNextPage, products.length, loadProductBatch]);
+  // Manual / Scroll load handler for more products
 
   // CategoriesGrid event listener
   React.useEffect(() => {
@@ -428,6 +403,21 @@ export default function FeaturedCatalog() {
                           <ProductCardSkeleton key={`next-skel-${i}`} />
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {hasMore && !isFetchingNextPage && (
+                    <div className="mt-10 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPage((prev) => prev + 1);
+                          loadProductBatch(products.length, true);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-white px-6 py-3 text-sm font-semibold text-brand-700 shadow-soft-xs transition-all hover:border-brand-400 hover:bg-brand-50 hover:shadow-soft-sm"
+                      >
+                        Load More Equipment ({totalItems - products.length} remaining)
+                      </button>
                     </div>
                   )}
 

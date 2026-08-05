@@ -1,0 +1,657 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Medical Marketplace : Product Catalog (30 products)
+    ===================================================
+    Replaces default demo/placeholder products with realistic medical equipment records.
+-->
+<odoo noupdate="0">
+
+    <!-- CATEGORY 1: DIAGNOSTIC EQUIPMENT -->
+
+    <!-- 1.1 Digital Stethoscope Pro (FEATURED 1) -->
+    <record id="product_stethoscope_pro" model="product.template">
+        <field name="name">Digital Stethoscope Pro</field>
+        <field name="default_code">DIAG-STET-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_diagnostic"/>
+        <field name="list_price" eval="285.00"/>
+        <field name="description_sale">Advanced digital stethoscope with ambient noise reduction, 3x amplification, and Bluetooth connectivity for real-time auscultation recording. Compatible with iOS and Android diagnostic apps. Includes dual-head chestpiece and three sizes of ear tips.</field>
+        <field name="certification_info">FDA 510(k) Cleared, CE Class IIa, ISO 13485</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">2 Years</field>
+        <field name="low_stock_threshold" eval="10"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="True"/>
+        <field name="featured_sequence" eval="1"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_diagnotech"/>
+    </record>
+
+    <!-- 1.2 Automatic BP Monitor -->
+    <record id="product_bp_monitor" model="product.template">
+        <field name="name">Automatic BP Monitor (Upper Arm)</field>
+        <field name="default_code">DIAG-BPMON-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_diagnostic"/>
+        <field name="list_price" eval="125.00"/>
+        <field name="description_sale">Clinically validated upper-arm blood pressure monitor with large LCD display, irregular heartbeat detection, and 60-memory dual-user storage. Fits arm circumference 22 to 42 cm. Includes universal AC adapter and storage case.</field>
+        <field name="certification_info">FDA Cleared, CE Certified, ESH/ESC Validated</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="5"/>
+        <field name="warranty_period">3 Years</field>
+        <field name="low_stock_threshold" eval="20"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_diagnotech"/>
+    </record>
+
+    <!-- 1.3 Non-Contact Infrared Thermometer -->
+    <record id="product_infrared_thermometer" model="product.template">
+        <field name="name">Non-Contact Infrared Thermometer</field>
+        <field name="default_code">DIAG-THERM-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_diagnostic"/>
+        <field name="list_price" eval="45.00"/>
+        <field name="description_sale">Professional-grade non-contact infrared thermometer with 0.1 degree C resolution, 1-second measurement, and fever alarm. Switchable Celsius/Fahrenheit display. Suitable for clinical and home-care screening. Memory stores last 32 readings.</field>
+        <field name="certification_info">FDA Cleared, CE Marked, RoHS Compliant</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="10"/>
+        <field name="warranty_period">1 Year</field>
+        <field name="low_stock_threshold" eval="50"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_diagnotech"/>
+    </record>
+
+    <!-- 1.4 Pulse Oximeter -->
+    <record id="product_pulse_oximeter" model="product.template">
+        <field name="name">Fingertip Pulse Oximeter SpO2</field>
+        <field name="default_code">DIAG-OXIM-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_diagnostic"/>
+        <field name="list_price" eval="38.00"/>
+        <field name="description_sale">High-accuracy fingertip pulse oximeter measuring SpO2 (blood oxygen saturation) and pulse rate with 2% accuracy. OLED dual-color display, auto power-off, and low battery indicator. Includes lanyard and protective case. For adult clinical use.</field>
+        <field name="certification_info">FDA 510(k) Cleared, CE Class IIa</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="10"/>
+        <field name="warranty_period">1 Year</field>
+        <field name="low_stock_threshold" eval="50"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_diagnotech"/>
+    </record>
+
+    <!-- 1.5 Blood Glucometer Kit -->
+    <record id="product_glucometer_kit" model="product.template">
+        <field name="name">Blood Glucometer Kit with 50 Strips</field>
+        <field name="default_code">DIAG-GLUC-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_diagnostic"/>
+        <field name="list_price" eval="65.00"/>
+        <field name="description_sale">Compact blood glucose monitoring system with 5-second result time, 500-test memory, and USB data transfer. Kit includes glucometer, 50 test strips, 50 lancets, lancing device, logbook, and carrying case. Measurement range: 20 to 600 mg/dL.</field>
+        <field name="certification_info">FDA Cleared, CE Marked, ISO 15197:2013</field>
+        <field name="unit_of_measure">Kit</field>
+        <field name="min_order_qty" eval="5"/>
+        <field name="warranty_period">2 Years (device)</field>
+        <field name="low_stock_threshold" eval="20"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_diagnotech"/>
+    </record>
+
+    <!-- CATEGORY 2: HOSPITAL FURNITURE -->
+
+    <!-- 2.1 Hydraulic Examination Table (FEATURED 2) -->
+    <record id="product_examination_table" model="product.template">
+        <field name="name">Hydraulic Examination Table</field>
+        <field name="default_code">FURN-EXMT-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_hospital_furniture"/>
+        <field name="list_price" eval="1850.00"/>
+        <field name="description_sale">Heavy-duty hydraulic examination table with adjustable height (65 to 95 cm), fold-down back section, and detachable leg rests. Load capacity 200 kg. Upholstered in antimicrobial vinyl. Includes paper roll holder and stirrups. Available in white and grey.</field>
+        <field name="certification_info">CE Certified, ISO 9001, EN 1970</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">3 Years (frame), 1 Year (hydraulics)</field>
+        <field name="low_stock_threshold" eval="3"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="True"/>
+        <field name="featured_sequence" eval="2"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medfurnish"/>
+    </record>
+
+    <!-- 2.2 Electric Hospital Bed -->
+    <record id="product_hospital_bed" model="product.template">
+        <field name="name">Electric Hospital Bed (3-Function)</field>
+        <field name="default_code">FURN-BED-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_hospital_furniture"/>
+        <field name="list_price" eval="2200.00"/>
+        <field name="description_sale">Three-function electric hospital bed with head, foot, and overall height adjustment via wired remote. Steel tubular frame with epoxy powder coating. Load capacity 250 kg. Includes 4 side rails, IV pole socket, brake casters, and ABS headboard/footboard.</field>
+        <field name="certification_info">CE Class I, ISO 9001, IEC 60601-1</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">5 Years (frame), 2 Years (motor)</field>
+        <field name="low_stock_threshold" eval="2"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medfurnish"/>
+    </record>
+
+    <!-- 2.3 Standard Wheelchair -->
+    <record id="product_wheelchair" model="product.template">
+        <field name="name">Foldable Standard Wheelchair</field>
+        <field name="default_code">FURN-WCHAIR-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_hospital_furniture"/>
+        <field name="list_price" eval="320.00"/>
+        <field name="description_sale">Lightweight foldable wheelchair with aluminium frame (weighs 13.5 kg), 18-inch seat width, and anti-tipping rear wheels. Removable and adjustable footrests. Seat belt included. Folds flat for transport and storage. Max user weight 120 kg.</field>
+        <field name="certification_info">CE Certified, ISO 7176, FDA Class II</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">2 Years (frame), 6 Months (upholstery)</field>
+        <field name="low_stock_threshold" eval="5"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medfurnish"/>
+    </record>
+
+    <!-- 2.4 IV Infusion Pole Stand -->
+    <record id="product_iv_pole" model="product.template">
+        <field name="name">IV Infusion Pole Stand (5-Hook)</field>
+        <field name="default_code">FURN-IVPOLE-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_hospital_furniture"/>
+        <field name="list_price" eval="85.00"/>
+        <field name="description_sale">Stainless steel 5-hook IV infusion pole on a 5-caster base. Height adjustable from 140 to 210 cm via telescopic column and locking collar. Heavy-duty chrome finish. Supports multiple infusion bags simultaneously. Easy to clean, corrosion-resistant.</field>
+        <field name="certification_info">CE Certified, ISO 9001</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="5"/>
+        <field name="warranty_period">2 Years</field>
+        <field name="low_stock_threshold" eval="15"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medfurnish"/>
+    </record>
+
+    <!-- 2.5 Medical Crash Cart -->
+    <record id="product_crash_cart" model="product.template">
+        <field name="name">Medical Emergency Crash Cart</field>
+        <field name="default_code">FURN-CRASH-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_hospital_furniture"/>
+        <field name="list_price" eval="650.00"/>
+        <field name="description_sale">Code-blue emergency crash cart with 5 lockable drawers (break-away seal system), monitor shelf, oxygen tank bracket, and push handle. ABS plastic construction. Includes color-coded drawer divider trays. Dimensions: 85 x 56 x 95 cm. Available in white or grey.</field>
+        <field name="certification_info">CE Class I, ISO 9001, UL Listed</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">3 Years</field>
+        <field name="low_stock_threshold" eval="3"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medfurnish"/>
+    </record>
+
+    <!-- CATEGORY 3: PPE & CONSUMABLES -->
+
+    <!-- 3.1 Nitrile Examination Gloves (FEATURED 3) -->
+    <record id="product_nitrile_gloves" model="product.template">
+        <field name="name">Nitrile Examination Gloves (100/box)</field>
+        <field name="default_code">PPE-GLOVE-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_ppe_consumables"/>
+        <field name="list_price" eval="18.50"/>
+        <field name="description_sale">Powder-free nitrile examination gloves with textured fingertips for superior grip. Latex-free safe for latex-sensitive patients and clinicians. AQL 1.5, 0.10 mm thick. Available in sizes S, M, L, XL. Box of 100 gloves. Suitable for examination, procedure, and chemotherapy use.</field>
+        <field name="certification_info">FDA 510(k) Cleared, ASTM D6319, EN 455-1/2/3</field>
+        <field name="unit_of_measure">Box</field>
+        <field name="min_order_qty" eval="10"/>
+        <field name="warranty_period">N/A</field>
+        <field name="low_stock_threshold" eval="100"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="True"/>
+        <field name="featured_sequence" eval="3"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medguard"/>
+    </record>
+
+    <!-- 3.2 Surgical Face Mask -->
+    <record id="product_surgical_mask" model="product.template">
+        <field name="name">Surgical Face Mask ASTM Level 3 (50/box)</field>
+        <field name="default_code">PPE-MASK-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_ppe_consumables"/>
+        <field name="list_price" eval="12.99"/>
+        <field name="description_sale">ASTM Level 3 surgical face masks with adjustable nose bridge, ear loops, and triple-layer filtration (outer fluid-resistant layer, melt-blown filter, inner soft layer). BFE 99%, PFE 99%. Box of 50. Available in blue, white, and black.</field>
+        <field name="certification_info">ASTM F2100 Level 3, FDA 510(k) Cleared, EN 14683 Type IIR</field>
+        <field name="unit_of_measure">Box</field>
+        <field name="min_order_qty" eval="20"/>
+        <field name="warranty_period">N/A</field>
+        <field name="low_stock_threshold" eval="200"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medguard"/>
+    </record>
+
+    <!-- 3.3 Luer Lock Syringes -->
+    <record id="product_luer_syringe" model="product.template">
+        <field name="name">5 mL Luer Lock Syringe — Sterile (100/box)</field>
+        <field name="default_code">PPE-SYR-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_ppe_consumables"/>
+        <field name="list_price" eval="22.00"/>
+        <field name="description_sale">Individually packaged sterile 5 mL Luer Lock syringes with smooth plunger action and clear barrel for accurate dose reading. Polypropylene barrel, rubber plunger tip, and latex-free gasket. EO sterilized, single-use. Box of 100 units.</field>
+        <field name="certification_info">FDA 510(k) Cleared, CE Class IIa, ISO 7886</field>
+        <field name="unit_of_measure">Box</field>
+        <field name="min_order_qty" eval="10"/>
+        <field name="warranty_period">N/A</field>
+        <field name="low_stock_threshold" eval="100"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medguard"/>
+    </record>
+
+    <!-- 3.4 Sterile Gauze Pads -->
+    <record id="product_gauze_pads" model="product.template">
+        <field name="name">Sterile Gauze Pads 4x4 in. (100/box)</field>
+        <field name="default_code">PPE-GAUZE-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_ppe_consumables"/>
+        <field name="list_price" eval="15.50"/>
+        <field name="description_sale">Pre-cut sterile woven gauze pads (10 x 10 cm / 4 x 4 in.), 8-ply, individually pouch-sealed for aseptic presentation. Non-adherent and highly absorbent. Suitable for wound cleaning, dressing, and post-surgical care. Box of 100 sterile pouches.</field>
+        <field name="certification_info">FDA 510(k) Cleared, CE Class I, USP Type VII</field>
+        <field name="unit_of_measure">Box</field>
+        <field name="min_order_qty" eval="20"/>
+        <field name="warranty_period">N/A</field>
+        <field name="low_stock_threshold" eval="150"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medguard"/>
+    </record>
+
+    <!-- 3.5 Alcohol Hand Sanitizer -->
+    <record id="product_hand_sanitizer" model="product.template">
+        <field name="name">Alcohol Hand Sanitizer Gel 500 mL</field>
+        <field name="default_code">PPE-SANIT-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_ppe_consumables"/>
+        <field name="list_price" eval="8.99"/>
+        <field name="description_sale">Hospital-grade 70% ethyl alcohol gel hand sanitizer with added moisturizers (aloe vera, glycerin) to prevent skin dryness. Kills 99.9% of common germs in 15 seconds. 500 mL pump bottle suitable for counter or wall-mount dispensers. WHO-formulation compliant.</field>
+        <field name="certification_info">FDA OTC Monograph, CE Biocidal, WHO Formulation</field>
+        <field name="unit_of_measure">Bottle</field>
+        <field name="min_order_qty" eval="24"/>
+        <field name="warranty_period">N/A</field>
+        <field name="low_stock_threshold" eval="200"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_medguard"/>
+    </record>
+
+    <!-- CATEGORY 4: SURGICAL INSTRUMENTS -->
+
+    <!-- 4.1 Scalpel Handle + Blade (FEATURED 4) -->
+    <record id="product_scalpel_set" model="product.template">
+        <field name="name">Scalpel Handle #4 with #22 Blades (10/pack)</field>
+        <field name="default_code">SURG-SCALP-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_surgical"/>
+        <field name="list_price" eval="28.50"/>
+        <field name="description_sale">Reusable stainless steel #4 scalpel handle with 10 individually sterile-packaged #22 carbon steel blades. Handle length 145 mm, compatible with blades #19 to #25. Blades have a lancet point for precision incisions. Autoclavable handle, single-use blades. EO sterilized.</field>
+        <field name="certification_info">CE Class IIa, ISO 7153-1, ASTM F564</field>
+        <field name="unit_of_measure">Set</field>
+        <field name="min_order_qty" eval="5"/>
+        <field name="warranty_period">Lifetime (handle)</field>
+        <field name="low_stock_threshold" eval="20"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="True"/>
+        <field name="featured_sequence" eval="4"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_surgipath"/>
+    </record>
+
+    <!-- 4.2 Tissue Forceps Set -->
+    <record id="product_forceps_set" model="product.template">
+        <field name="name">Tissue Forceps Set — 5 Piece</field>
+        <field name="default_code">SURG-FORC-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_surgical"/>
+        <field name="list_price" eval="145.00"/>
+        <field name="description_sale">Premium 5-piece tissue forceps set in German stainless steel (1.4301): Adson 1x2 tooth, Adson smooth, DeBakey vascular, Russian, and tissue forceps. Autoclavable. Supplied in a sterile pouch set. Designed for general surgery, plastic surgery, and microsurgery applications.</field>
+        <field name="certification_info">CE Class I, ISO 7153-1, ISO 9001</field>
+        <field name="unit_of_measure">Set</field>
+        <field name="min_order_qty" eval="2"/>
+        <field name="warranty_period">5 Years</field>
+        <field name="low_stock_threshold" eval="10"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_surgipath"/>
+    </record>
+
+    <!-- 4.3 Basic Surgical Instrument Kit -->
+    <record id="product_surgical_kit" model="product.template">
+        <field name="name">Basic Surgical Instrument Kit (22-Piece)</field>
+        <field name="default_code">SURG-KIT-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_surgical"/>
+        <field name="list_price" eval="380.00"/>
+        <field name="description_sale">Comprehensive 22-piece basic surgical instrument kit in 304 stainless steel: includes needle holders, hemostats, scissors (Metzenbaum + Mayo), retractors, suction cannulas, forceps, scalpel handle, and probe. Stored in a perforated autoclave tray. Suitable for general procedures and minor OR setups.</field>
+        <field name="certification_info">CE Class I, FDA 510(k) Cleared, ISO 13485</field>
+        <field name="unit_of_measure">Kit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">5 Years</field>
+        <field name="low_stock_threshold" eval="5"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_surgipath"/>
+    </record>
+
+    <!-- 4.4 Needle Holder -->
+    <record id="product_needle_holder" model="product.template">
+        <field name="name">Mayo-Hegar Needle Holder 15 cm</field>
+        <field name="default_code">SURG-NEEDLE-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_surgical"/>
+        <field name="list_price" eval="55.00"/>
+        <field name="description_sale">Mayo-Hegar pattern needle holder in 304-grade stainless steel with tungsten carbide jaw inserts for superior needle grip. 15 cm (6 in.) length, ratchet lock handle. Autoclavable. Suitable for 0-3 sutures. Ideal for general surgical procedures.</field>
+        <field name="certification_info">CE Class I, ISO 7153-1</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="5"/>
+        <field name="warranty_period">5 Years</field>
+        <field name="low_stock_threshold" eval="15"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_surgipath"/>
+    </record>
+
+    <!-- 4.5 Surgical Scissors Set -->
+    <record id="product_scissors_set" model="product.template">
+        <field name="name">Surgical Scissors Set (Metzenbaum + Mayo)</field>
+        <field name="default_code">SURG-SCIS-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_surgical"/>
+        <field name="list_price" eval="125.00"/>
+        <field name="description_sale">Pair of premium surgical scissors in a matched set: (1) Metzenbaum curved 18 cm for delicate tissue dissection, and (2) Mayo straight 17 cm for cutting heavy tissue and sutures. Both in 304 stainless steel with tungsten carbide blades. Autoclavable. Supplied in padded pouch.</field>
+        <field name="certification_info">CE Class I, ISO 7153-1, ISO 9001</field>
+        <field name="unit_of_measure">Set</field>
+        <field name="min_order_qty" eval="2"/>
+        <field name="warranty_period">5 Years</field>
+        <field name="low_stock_threshold" eval="10"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_surgipath"/>
+    </record>
+
+    <!-- CATEGORY 5: IMAGING & LAB EQUIPMENT -->
+
+    <!-- 5.1 Portable Ultrasound Scanner (FEATURED 5) -->
+    <record id="product_ultrasound_scanner" model="product.template">
+        <field name="name">Portable Ultrasound Scanner (Wireless)</field>
+        <field name="default_code">LAB-ULTRA-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_imaging_lab"/>
+        <field name="list_price" eval="8500.00"/>
+        <field name="description_sale">Point-of-care wireless portable ultrasound probe with dual-frequency convex and linear transducer. Connects to iOS/Android tablets or Windows laptops via Wi-Fi. Supports B-mode, M-mode, color Doppler, and pulse wave Doppler. Battery life 3 hours. Includes charging dock and carry case.</field>
+        <field name="certification_info">FDA 510(k) Cleared, CE Class IIa, ISO 13485</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">2 Years</field>
+        <field name="low_stock_threshold" eval="3"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="True"/>
+        <field name="featured_sequence" eval="5"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_aura_medical"/>
+    </record>
+
+    <!-- 5.2 Bench-Top Centrifuge -->
+    <record id="product_centrifuge" model="product.template">
+        <field name="name">Bench-Top Laboratory Centrifuge 4000 rpm</field>
+        <field name="default_code">LAB-CENT-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_imaging_lab"/>
+        <field name="list_price" eval="1200.00"/>
+        <field name="description_sale">High-speed bench-top centrifuge with brushless motor, digital speed/time display, and imbalance auto-cutoff. Max RCF 2,576 x g at 4,000 rpm. Accepts 24 x 1.5/2 mL microtubes or 4 x 15 mL conical tubes. Includes 3 rotors. Quiet operation under 58 dB. Ideal for blood, urine, and biochemical separation.</field>
+        <field name="certification_info">CE Marked, IVD Directive 98/79/EC, ISO 9001</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">2 Years</field>
+        <field name="low_stock_threshold" eval="3"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_aura_medical"/>
+    </record>
+
+    <!-- 5.3 Clinical Binocular Microscope -->
+    <record id="product_microscope" model="product.template">
+        <field name="name">Clinical Binocular Microscope (1000x LED)</field>
+        <field name="default_code">LAB-MICRO-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_imaging_lab"/>
+        <field name="list_price" eval="2800.00"/>
+        <field name="description_sale">Professional clinical binocular microscope with 4-objective nosepiece (4x, 10x, 40x, 100x oil), wide-field 10x eyepieces, mechanical stage, and 3W LED Kohler illumination. Total magnification range 40x to 1000x. Built-in light intensity control. Suitable for haematology, bacteriology, and histopathology labs.</field>
+        <field name="certification_info">CE Class I, ISO 9001, RoHS Compliant</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">3 Years</field>
+        <field name="low_stock_threshold" eval="3"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_aura_medical"/>
+    </record>
+
+    <!-- 5.4 Hematology Analyzer -->
+    <record id="product_hematology_analyzer" model="product.template">
+        <field name="name">3-Part Differential Hematology Analyzer</field>
+        <field name="default_code">LAB-HEMAT-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_imaging_lab"/>
+        <field name="list_price" eval="4500.00"/>
+        <field name="description_sale">Fully automated 3-part differential hematology analyzer with 18-parameter CBC panel (WBC, RBC, HGB, HCT, PLT, and 3-part WBC differential). Throughput: 60 samples/hour. Touch-screen interface, internal QC functions, and bidirectional LIS connectivity. Includes reagent starter pack.</field>
+        <field name="certification_info">FDA 510(k) Cleared, CE IVD, ISO 13485</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">2 Years</field>
+        <field name="low_stock_threshold" eval="2"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_aura_medical"/>
+    </record>
+
+    <!-- 5.5 PCR Thermal Cycler -->
+    <record id="product_pcr_cycler" model="product.template">
+        <field name="name">PCR Thermal Cycler — 96-Well Block</field>
+        <field name="default_code">LAB-PCR-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_imaging_lab"/>
+        <field name="list_price" eval="6200.00"/>
+        <field name="description_sale">High-performance gradient PCR thermal cycler with 96-well (0.2 mL) block, ramp rate up to 4 degrees C/s, and temperature uniformity 0.3 degrees C. 7-inch touchscreen with intuitive protocol editor. USB and LAN connectivity for data export. Includes lifetime warranty on Peltier elements.</field>
+        <field name="certification_info">CE Marked, IVD, ISO 9001, RoHS</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">3 Years (electronics), Lifetime (Peltier)</field>
+        <field name="low_stock_threshold" eval="2"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_aura_medical"/>
+    </record>
+
+    <!-- CATEGORY 6: HOME CARE EQUIPMENT -->
+
+    <!-- 6.1 Tabletop Mesh Nebulizer (FEATURED 6) -->
+    <record id="product_nebulizer" model="product.template">
+        <field name="name">Tabletop Mesh Nebulizer</field>
+        <field name="default_code">HOME-NEB-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_home_care"/>
+        <field name="list_price" eval="95.00"/>
+        <field name="description_sale">Silent vibrating mesh nebulizer for aerosol drug delivery in COPD, asthma, and respiratory therapy. Particle size MMAD 2.5 to 4 um for deep lung penetration. 3 mL medication cup, 5 to 10 minute treatment time, near-silent operation under 25 dB. Includes adult and pediatric masks, mouthpiece, and carry case.</field>
+        <field name="certification_info">FDA 510(k) Cleared, CE Class IIa, ISO 13485</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">2 Years</field>
+        <field name="low_stock_threshold" eval="15"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="True"/>
+        <field name="featured_sequence" eval="6"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_homecare_pro"/>
+    </record>
+
+    <!-- 6.2 Folding Aluminum Walker -->
+    <record id="product_aluminum_walker" model="product.template">
+        <field name="name">Folding Aluminum Walker (Height Adjustable)</field>
+        <field name="default_code">HOME-WALK-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_home_care"/>
+        <field name="list_price" eval="58.00"/>
+        <field name="description_sale">Lightweight folding aluminium walker with push-button height adjustment (81 to 91 cm / 32 to 36 in.), non-slip rubber tips, and ergonomic hand grips. Weighs only 1.8 kg. Folds flat for easy transport and storage. Max user weight 136 kg (300 lbs). Suitable for indoor and outdoor use.</field>
+        <field name="certification_info">FDA Class II, CE Certified, ISO 11199-1</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">1 Year</field>
+        <field name="low_stock_threshold" eval="20"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_homecare_pro"/>
+    </record>
+
+    <!-- 6.3 Home Oxygen Concentrator -->
+    <record id="product_oxygen_concentrator" model="product.template">
+        <field name="name">Home Oxygen Concentrator 5 L/min</field>
+        <field name="default_code">HOME-OXY-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_home_care"/>
+        <field name="list_price" eval="850.00"/>
+        <field name="description_sale">Stationary home oxygen concentrator delivering 1 to 5 L/min of 93% pure oxygen. Auto-adjusting molecular sieve technology, built-in alarm for power failure and low O2 concentration, cumulative hour meter, and low-noise operation (42 dB). Includes humidifier bottle, nasal cannula (adult), and 3-m tubing. 110 to 240 V universal.</field>
+        <field name="certification_info">FDA 510(k) Cleared, CE Class IIb, ISO 8359</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">3 Years</field>
+        <field name="low_stock_threshold" eval="5"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_homecare_pro"/>
+    </record>
+
+    <!-- 6.4 Standard Rollator -->
+    <record id="product_rollator" model="product.template">
+        <field name="name">Standard Rollator with Padded Seat</field>
+        <field name="default_code">HOME-ROLL-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_home_care"/>
+        <field name="list_price" eval="175.00"/>
+        <field name="description_sale">Lightweight aluminium rollator walker with 8-inch wheels, padded seat and backrest, loop-lock hand brakes, and under-seat storage bag. Height-adjustable handles (81 to 96 cm). Folds compact (51 cm deep) for car transport. Weight 8 kg. Max user weight 135 kg. Non-slip rubber wheel covers.</field>
+        <field name="certification_info">FDA Class II, CE Certified, ISO 11199-2</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="1"/>
+        <field name="warranty_period">2 Years (frame), 1 Year (seat/wheels)</field>
+        <field name="low_stock_threshold" eval="10"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_homecare_pro"/>
+    </record>
+
+    <!-- 6.5 Medical Bed Wedge Pillow -->
+    <record id="product_bed_wedge" model="product.template">
+        <field name="name">Medical Bed Wedge Pillow — 45 Degree Incline</field>
+        <field name="default_code">HOME-WEDGE-001</field>
+        <field name="type">product</field>
+        <field name="categ_id" ref="categ_home_care"/>
+        <field name="list_price" eval="45.00"/>
+        <field name="description_sale">Orthopaedic foam wedge pillow at 45 degree incline for acid reflux, GERD, post-surgery positioning, and respiratory support. High-density memory foam core, removable hypoallergenic cover (machine washable). Dimensions 60 x 60 x 30 cm. Suitable for bed and chair use. Includes storage bag.</field>
+        <field name="certification_info">CE Class I, CertiPUR-US Foam, OEKO-TEX Standard 100</field>
+        <field name="unit_of_measure">Unit</field>
+        <field name="min_order_qty" eval="5"/>
+        <field name="warranty_period">1 Year</field>
+        <field name="low_stock_threshold" eval="20"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="marketplace_published" eval="True"/>
+        <field name="marketplace_featured" eval="False"/>
+        <field name="has_vendor_company" eval="True"/>
+        <field name="vendor_id" ref="vendor_homecare_pro"/>
+    </record>
+
+</odoo>
