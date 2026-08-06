@@ -3,16 +3,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, CheckCircle2, LayoutGrid, Loader2 } from 'lucide-react';
+import { CheckCircle2, LayoutGrid, Loader2 } from 'lucide-react';
 
 import type { Product, PaginatedProductsResponse } from '@/lib/odooClient';
 import { CATALOG_LABELS } from '@/lib/constants';
-import { Container } from '@/components/shared/Container';
 import { SectionHeading } from '@/components/shared/SectionHeading';
 import { ProductCard, ProductCardSkeleton } from '@/components/products/ProductCard';
 
 const BATCH_SIZE = 20;
-const SCROLL_THRESHOLD_PX = 450;
 
 export default function FeaturedProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -78,8 +76,6 @@ export default function FeaturedProductsPage() {
     fetchFeaturedBatch(0, false);
   }, [fetchFeaturedBatch]);
 
-  // Manual / Scroll load handler for more products
-
   // ── Cart handler ────────────────────────────────────────────────────────
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
@@ -117,31 +113,23 @@ export default function FeaturedProductsPage() {
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-ink-50/40 py-10 sm:py-14">
-      <Container>
+      <div className="w-full px-4 sm:px-6">
+
+        {/* ── Single canonical heading ─────────────────────────────────── */}
         <SectionHeading
           eyebrow="Live Catalog"
           title="Featured equipment, sourced with confidence."
           subtitle="Filter and search verified medical equipment from our supplier network — every listing shows real-time availability, compliance, and bulk pricing."
+          align="left"
         />
 
-        {/* Page Header */}
-        <div className="max-w-2xl">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-brand-700">
-            <Sparkles className="h-3.5 w-3.5" />
-            Curated Sourcing
-          </span>
-          <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            Simple Catalog Equipment
-          </h1>
-          <p className="mt-3 text-base text-ink-500">
-            Explore curated medical equipment, critical devices, and supplies from verified B2B manufacturers and distributors.
-          </p>
-        </div>
+        {/* Thin rule separating heading from grid — enterprise visual rhythm */}
+        <div className="mt-8 border-b border-ink-100 pb-6" />
 
-        {/* Product Grid */}
+        {/* ── Product Grid ─────────────────────────────────────────────── */}
         <div className="mt-8">
           {loading ? (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {Array.from({ length: 8 }).map((_, i) => (
                 <ProductCardSkeleton key={i} />
               ))}
@@ -155,14 +143,14 @@ export default function FeaturedProductsPage() {
               </p>
               <Link
                 href="/"
-                className="mt-2 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+                className="mt-2 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/40"
               >
                 Browse Main Catalog
               </Link>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {products.map((product, i) => (
                   <ProductCard key={product.id} product={product} index={i} onAddToCart={handleAddToCart} />
                 ))}
@@ -174,7 +162,7 @@ export default function FeaturedProductsPage() {
                   <div className="mb-4 flex items-center justify-center gap-2 text-xs font-medium text-brand-700">
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading more equipment...
                   </div>
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {Array.from({ length: 4 }).map((_, i) => (
                       <ProductCardSkeleton key={`next-skel-${i}`} />
                     ))}
@@ -183,13 +171,13 @@ export default function FeaturedProductsPage() {
               )}
 
               {hasMore && !isFetchingNextPage && (
-                <div className="mt-8 text-center">
+                <div className="mt-10 text-center">
                   <button
                     type="button"
                     onClick={() => {
                       fetchFeaturedBatch(products.length, true);
                     }}
-                    className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-5 py-2.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100 hover:text-brand-800"
+                    className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-white px-6 py-3 text-sm font-semibold text-brand-700 shadow-soft-xs transition-all hover:border-brand-400 hover:bg-brand-50 hover:shadow-soft-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/30"
                   >
                     Load More Equipment ({totalItems - products.length} remaining)
                   </button>
@@ -205,7 +193,7 @@ export default function FeaturedProductsPage() {
             </>
           )}
         </div>
-      </Container>
+      </div>
 
       {/* Toast */}
       <AnimatePresence>

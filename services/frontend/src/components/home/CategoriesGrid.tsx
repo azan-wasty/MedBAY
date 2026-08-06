@@ -3,7 +3,6 @@
 import { ScanLine, HeartPulse, Syringe, FlaskConical, Boxes, BedDouble, Activity, ArrowRight, type LucideIcon } from "lucide-react";
 
 import { CATEGORY_SHOWCASE } from "@/lib/constants";
-import { Container } from "@/components/shared/Container";
 import { SectionHeading } from "@/components/shared/SectionHeading";
 import { Stagger, StaggerItem } from "@/components/shared/Reveal";
 
@@ -26,7 +25,7 @@ function selectCategory(name: string) {
 export default function CategoriesGrid() {
   return (
     <section id="categories" className="py-20 sm:py-28">
-      <Container>
+    <div className="px-4 sm:px-6">
         <SectionHeading
           eyebrow="Shop by Category"
           title="Every department, one marketplace."
@@ -59,7 +58,7 @@ export default function CategoriesGrid() {
             );
           })}
         </Stagger>
-      </Container>
+    </div>
     </section>
   );
 }

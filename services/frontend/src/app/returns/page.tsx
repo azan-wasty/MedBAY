@@ -267,8 +267,9 @@ export default function ReturnsPage() {
               <div>
                 <Label>{RETURNS_LABELS.typeLabel}</Label>
                 <div className="mt-1 flex gap-5">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-700">
+                  <label htmlFor="return-type-refund" className="flex cursor-pointer items-center gap-2 text-sm text-ink-700">
                     <input
+                      id="return-type-refund"
                       type="radio"
                       name="return_type"
                       checked={returnType === 'refund'}
@@ -278,8 +279,9 @@ export default function ReturnsPage() {
                     />
                     {RETURNS_LABELS.refundOption}
                   </label>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-700">
+                  <label htmlFor="return-type-replacement" className="flex cursor-pointer items-center gap-2 text-sm text-ink-700">
                     <input
+                      id="return-type-replacement"
                       type="radio"
                       name="return_type"
                       checked={returnType === 'replacement'}

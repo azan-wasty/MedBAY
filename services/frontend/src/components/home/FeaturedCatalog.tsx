@@ -6,7 +6,6 @@ import { Search, CheckCircle2, LayoutGrid, Loader2 } from "lucide-react";
 
 import { CATALOG_LABELS, FILTER_LABELS, type SortOption } from "@/lib/constants";
 import type { Product, PaginatedProductsResponse } from "@/lib/odooClient";
-import { Container } from "@/components/shared/Container";
 import { SectionHeading } from "@/components/shared/SectionHeading";
 import { ProductCard, ProductCardSkeleton } from "@/components/products/ProductCard";
 import { FilterSidebar, type FilterState } from "@/components/products/FilterSidebar";
@@ -289,11 +288,15 @@ export default function FeaturedCatalog() {
 
   return (
     <section id="catalog" className="scroll-mt-20 bg-ink-50/40 py-10 sm:py-14">
-      <Container>
+      {/* Wide, data-dense wrapper — px-4/px-6 instead of the Container class */}
+      <div className="w-full px-4 sm:px-6">
+
+        {/* ── Single canonical heading (left-aligned, enterprise tone) ── */}
         <SectionHeading
           eyebrow="Live Catalog"
           title="Featured equipment, sourced with confidence."
           subtitle="Filter and search verified medical equipment from our supplier network — every listing shows real-time availability, compliance, and bulk pricing."
+          align="left"
         />
 
         <div className="mt-10 flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -317,6 +320,8 @@ export default function FeaturedCatalog() {
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
                 <input
+                  id="featured-catalog-search"
+                  name="catalog_search"
                   type="text"
                   placeholder={CATALOG_LABELS.searchPlaceholder}
                   value={searchTerm}
@@ -352,7 +357,7 @@ export default function FeaturedCatalog() {
             {/* Product Grid */}
             <div className="mt-6">
               {loading ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                   {Array.from({ length: 8 }).map((_, i) => (
                     <ProductCardSkeleton key={i} />
                   ))}
@@ -372,7 +377,7 @@ export default function FeaturedCatalog() {
                       <button
                         type="button"
                         onClick={clearAllFilters}
-                        className="mt-2 text-[13px] font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
+                        className="mt-2 text-[13px] font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/30"
                       >
                         {FILTER_LABELS.clearAll}
                       </button>
@@ -381,7 +386,7 @@ export default function FeaturedCatalog() {
                 </motion.div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                     {products.map((product, i) => (
                       <ProductCard
                         key={product.id}
@@ -398,7 +403,7 @@ export default function FeaturedCatalog() {
                       <div className="mb-4 flex items-center justify-center gap-2 text-xs font-medium text-brand-700">
                         <Loader2 className="h-4 w-4 animate-spin" /> Loading more equipment...
                       </div>
-                      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                         {Array.from({ length: 4 }).map((_, i) => (
                           <ProductCardSkeleton key={`next-skel-${i}`} />
                         ))}
@@ -414,7 +419,7 @@ export default function FeaturedCatalog() {
                           setPage((prev) => prev + 1);
                           loadProductBatch(products.length, true);
                         }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-white px-6 py-3 text-sm font-semibold text-brand-700 shadow-soft-xs transition-all hover:border-brand-400 hover:bg-brand-50 hover:shadow-soft-sm"
+                        className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-white px-6 py-3 text-sm font-semibold text-brand-700 shadow-soft-xs transition-all hover:border-brand-400 hover:bg-brand-50 hover:shadow-soft-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/30"
                       >
                         Load More Equipment ({totalItems - products.length} remaining)
                       </button>
@@ -432,7 +437,7 @@ export default function FeaturedCatalog() {
             </div>
           </div>
         </div>
-      </Container>
+      </div>
 
       {/* Toast Notification */}
       <AnimatePresence>

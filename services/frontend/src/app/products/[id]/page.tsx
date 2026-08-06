@@ -505,6 +505,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   <Minus className="h-4 w-4" />
                 </button>
                 <input
+                  id="product-quantity"
+                  name="quantity"
                   type="number"
                   value={quantity}
                   onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}

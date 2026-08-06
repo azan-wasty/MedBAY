@@ -7,25 +7,22 @@ import {
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
-  Building2,
-  ImageOff,
   Sparkles,
   ChevronLeft,
   ChevronRight,
   Pause,
 } from "lucide-react";
 
-import { HERO_CONTENT, MOCK_PRODUCTS, STOCK_STATUS_MAP } from "@/lib/constants";
-import { getProductImageSrc } from "@/lib/image";
+import { HERO_CONTENT, MOCK_PRODUCTS } from "@/lib/constants";
 import type { Product } from "@/lib/odooClient";
 import { Container } from "@/components/shared/Container";
 import { Reveal, EASE_OUT } from "@/components/shared/Reveal";
 import { PulseLine } from "@/components/shared/PulseLine";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/badge";
 import { AntidoteVial } from "@/components/home/AntidoteVial";
+import { HeroProductCard, HeroProductCardSkeleton } from "@/components/products/HeroProductCard";
 
-const heroProduct = MOCK_PRODUCTS[0];
+const heroProduct = MOCK_PRODUCTS[0] as Product;
 const ROTATION_INTERVAL_MS = 3500;
 
 export default function Hero() {
@@ -125,11 +122,9 @@ export default function Hero() {
         </div>
       </Container>
 
-      {/* Featured product — centered below the primary hero row, with a
-          single lifeline drawn behind it (see HeroSingleSlotRotator /
-          HeroStaticFallback, which no longer render their own). */}
-      <Container className="mt-16 sm:mt-20 lg:mt-24">
-        <div className="relative mx-auto w-full max-w-md">
+      {/* ── Featured product — horizontal card, full bleed below hero row ── */}
+      <div className="mt-16 px-4 sm:mt-20 sm:px-6 lg:mt-24">
+        <div className="relative w-full">
           <PulseLine
             width={360}
             strokeWidth={2}
@@ -147,7 +142,7 @@ export default function Hero() {
             <HeroStaticFallback shouldReduceMotion={Boolean(shouldReduceMotion)} />
           )}
         </div>
-      </Container>
+      </div>
     </section>
   );
 }
@@ -169,8 +164,8 @@ function HeroSingleSlotRotator({
   const total = products.length;
   const isMulti = total > 1;
 
-  // Auto-rotation timer: loops through products every 3.5 seconds.
-  // Pauses on hover/focus and disables when reduced motion is preferred.
+  // Auto-rotation timer: loops through products every 3.5 s.
+  // Pauses on hover/focus; disabled when reduced motion is preferred.
   React.useEffect(() => {
     if (!isMulti || isHovered || shouldReduceMotion) return;
 
@@ -182,17 +177,6 @@ function HeroSingleSlotRotator({
   }, [isMulti, isHovered, shouldReduceMotion, total]);
 
   const currentProduct = products[activeIndex] || products[0];
-
-  const categoryName = Array.isArray(currentProduct.categ_id)
-    ? currentProduct.categ_id[1]
-    : currentProduct.categ_id;
-  const vendorName = Array.isArray(currentProduct.vendor_id)
-    ? currentProduct.vendor_id[1]
-    : undefined;
-  const imageSrc = getProductImageSrc(currentProduct.image_1920 || currentProduct.image_256);
-  const stockConfig = currentProduct.stock_status
-    ? STOCK_STATUS_MAP[currentProduct.stock_status]
-    : undefined;
 
   const handlePrev = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -206,7 +190,7 @@ function HeroSingleSlotRotator({
 
   return (
     <div className="relative">
-      {/* Top Rotator Header Bar */}
+      {/* Header bar: spotlight badge + pause indicator + view-all link */}
       <div className="mb-3.5 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-brand-700">
@@ -221,7 +205,6 @@ function HeroSingleSlotRotator({
           )}
         </div>
 
-        {/* View All link — pointing to dedicated /featured page */}
         {isMulti && (
           <Link
             href="/featured"
@@ -233,13 +216,13 @@ function HeroSingleSlotRotator({
         )}
       </div>
 
-      {/* Single Slot Card Container */}
+      {/* Card wrapper — provides outer border/shadow/rounded, passes group for image hover */}
       <div
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onFocus={() => setIsHovered(true)}
         onBlur={() => setIsHovered(false)}
-        className="relative overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-xl"
+        className="group relative overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-xl transition-all duration-300 hover:border-brand-300 hover:shadow-[0_24px_56px_-12px_rgba(0,0,0,0.16)]"
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -248,97 +231,20 @@ function HeroSingleSlotRotator({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -8 }}
             transition={{ duration: shouldReduceMotion ? 0.15 : 0.35, ease: EASE_OUT }}
-            className="flex flex-col"
+            className="w-full"
           >
-            {/* Card Image */}
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-ink-50">
-              {imageSrc ? (
-                <img
-                  src={imageSrc}
-                  alt={currentProduct.name}
-                  loading="eager"
-                  decoding="async"
-                  fetchPriority="high"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-ink-300">
-                  <ImageOff className="h-10 w-10" strokeWidth={1.4} />
-                </div>
-              )}
-
-              {/* Badges */}
-              <div className="absolute left-3.5 top-3.5 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white/95 px-2.5 py-1 text-[10.5px] font-semibold text-brand-700 shadow-soft-xs backdrop-blur-sm">
-                  <ShieldCheck className="h-3 w-3" />
-                  Verified Supplier
-                </span>
-              </div>
-
-              {stockConfig && currentProduct.stock_status !== "not_tracked" && (
-                <div className="absolute right-3.5 top-3.5">
-                  <StatusBadge config={stockConfig} className="shadow-soft-xs backdrop-blur-sm" />
-                </div>
-              )}
-            </div>
-
-            {/* Card Content Body */}
-            <div className="p-5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">
-                  {categoryName || "Equipment"}
-                </span>
-                {isMulti && (
-                  <span className="font-data text-[11px] font-medium text-ink-400">
-                    {activeIndex + 1} of {total}
-                  </span>
-                )}
-              </div>
-
-              <h3 className="mt-1.5 line-clamp-1 font-display text-[16px] font-semibold text-ink-900 hover:text-brand-700">
-                <Link href={`/products/${currentProduct.id}`}>{currentProduct.name}</Link>
-              </h3>
-
-              {vendorName && (
-                <p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-ink-500">
-                  <Building2 className="h-3.5 w-3.5 text-ink-400 shrink-0" />
-                  <span className="truncate">{vendorName}</span>
-                </p>
-              )}
-
-              {/* Price & Specs row */}
-              <div className="mt-3.5 flex items-center justify-between rounded-lg bg-ink-50/70 px-3 py-2.5">
-                <span className="text-[10.5px] font-medium uppercase tracking-wide text-ink-400">
-                  List Price
-                </span>
-                <span className="font-data text-[15px] font-semibold text-ink-900">
-                  {currentProduct.list_price > 0
-                    ? `$${currentProduct.list_price.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                    : "Contact Sales"}
-                </span>
-              </div>
-
-              <div className="mt-3.5 flex items-center justify-between pt-1">
-                <span className="text-[12px] text-ink-500">
-                  MOQ: <strong className="font-medium text-ink-700">{currentProduct.min_order_qty}</strong>
-                </span>
-
-                <Button asChild size="sm" variant="brand" className="h-8 px-3 text-[12px]">
-                  <Link href={`/products/${currentProduct.id}`}>
-                    View Product <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                  </Link>
-                </Button>
-              </div>
-            </div>
+            <HeroProductCard
+              product={currentProduct}
+              shouldReduceMotion={shouldReduceMotion}
+              activeIndex={activeIndex}
+              total={total}
+            />
           </motion.div>
         </AnimatePresence>
 
-        {/* Manual Prev / Next arrows overlay on hover if multiple items */}
+        {/* Prev / Next arrows — constrained to the image panel on desktop */}
         {isMulti && (
-          <div className="pointer-events-none absolute inset-x-2 top-1/3 flex justify-between">
+          <div className="pointer-events-none absolute inset-x-2 top-1/3 flex justify-between sm:right-[56%] sm:top-1/2 sm:-translate-y-1/2">
             <button
               onClick={handlePrev}
               aria-label="Previous featured product"
@@ -357,7 +263,7 @@ function HeroSingleSlotRotator({
         )}
       </div>
 
-      {/* Pagination Dot Indicators */}
+      {/* Dot pagination indicators */}
       {isMulti && (
         <div className="mt-3 flex items-center justify-center gap-1.5">
           {products.map((_, idx) => (
@@ -366,10 +272,11 @@ function HeroSingleSlotRotator({
               type="button"
               onClick={() => setActiveIndex(idx)}
               aria-label={`Go to featured product ${idx + 1}`}
-              className={`h-2 rounded-full transition-all duration-300 ${idx === activeIndex
+              className={`h-2 rounded-full transition-all duration-300 ${
+                idx === activeIndex
                   ? "w-6 bg-brand-600"
                   : "w-2 bg-ink-200 hover:bg-ink-400"
-                }`}
+              }`}
             />
           ))}
         </div>
@@ -379,57 +286,21 @@ function HeroSingleSlotRotator({
 }
 
 // ---------------------------------------------------------------------------
-// Fallback Visual when No Products Are Marked Featured
+// Fallback — shown when no products are marked as featured
 // ---------------------------------------------------------------------------
 
 function HeroStaticFallback({ shouldReduceMotion }: { shouldReduceMotion: boolean }) {
   return (
     <Reveal delay={0.18} y={26}>
       <div className="relative">
-        <motion.div
-          style={{ "--tilt": "1.4deg" } as React.CSSProperties}
-          animate={shouldReduceMotion ? undefined : { translateY: [0, -10, 0] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          className="relative rotate-[1.4deg] overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-xl"
-        >
-          <div className="relative aspect-[4/3] w-full overflow-hidden bg-ink-50">
-            <img
-              src={(heroProduct.image_1920 as string) || (heroProduct.image_256 as string)}
-              alt={heroProduct.name}
-              loading="eager"
-              decoding="async"
-              fetchPriority="high"
-              className="h-full w-full object-cover"
-            />
-            <span className="absolute left-3.5 top-3.5 inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white/95 px-2.5 py-1 text-[10.5px] font-semibold text-brand-700 shadow-soft-xs">
-              <ShieldCheck className="h-3 w-3" />
-              Verified Supplier
-            </span>
-          </div>
-          <div className="p-5">
-            <p className="font-display text-[15px] font-semibold text-ink-900">{heroProduct.name}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-ink-500">
-              <Building2 className="h-3.5 w-3.5 text-ink-400" />
-              {heroProduct.vendor_id[1]}
-            </p>
-            <div className="mt-3.5 flex items-center justify-between rounded-lg bg-ink-50/70 px-3 py-2.5">
-              <span className="text-[10.5px] font-medium uppercase tracking-wide text-ink-400">List Price</span>
-              <span className="font-data text-[15px] font-semibold text-ink-900">
-                ${heroProduct.list_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-[12px] text-ink-500">
-              <span>
-                MOQ: <strong className="font-medium text-ink-700">{heroProduct.min_order_qty}</strong>
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700">
-                In Stock
-              </span>
-            </div>
-          </div>
-        </motion.div>
+        <div className="group overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-xl transition-all duration-300 hover:border-brand-300 hover:shadow-[0_24px_56px_-12px_rgba(0,0,0,0.16)]">
+          <HeroProductCard
+            product={heroProduct}
+            shouldReduceMotion={shouldReduceMotion}
+          />
+        </div>
 
-        {/* Secondary floating chip — RFQ moment */}
+        {/* Floating RFQ approval chip */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -454,15 +325,5 @@ function HeroStaticFallback({ shouldReduceMotion }: { shouldReduceMotion: boolea
 // ---------------------------------------------------------------------------
 
 function HeroLoadingSkeleton() {
-  return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-xl">
-      <div className="skeleton-shimmer aspect-[4/3] w-full" />
-      <div className="flex flex-col gap-2.5 p-5">
-        <div className="skeleton-shimmer h-3 w-1/3 rounded" />
-        <div className="skeleton-shimmer h-5 w-4/5 rounded" />
-        <div className="skeleton-shimmer h-3.5 w-1/2 rounded" />
-        <div className="skeleton-shimmer mt-3 h-10 w-full rounded-lg" />
-      </div>
-    </div>
-  );
+  return <HeroProductCardSkeleton />;
 }

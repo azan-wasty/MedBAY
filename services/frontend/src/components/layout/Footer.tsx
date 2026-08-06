@@ -1,10 +1,14 @@
-import Link from "next/link";
+"use client";
+
 import { Mail, Phone, MapPin, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
 import { BRAND_CONFIG, NAV_LINKS } from "@/lib/constants";
+import { type LegalDocId } from "@/lib/legalContent";
 import { Logo } from "@/components/shared/Logo";
 import { Container } from "@/components/shared/Container";
 import { PulseLine } from "@/components/shared/PulseLine";
+import { LegalModal, useLegalModal } from "@/components/shared/LegalModal";
 
 const marketplaceLinks = [
   { label: "Browse catalog", href: "/" },
@@ -21,13 +25,16 @@ const companyLinks = [
   { label: "FAQ", href: "/#faq" },
 ];
 
-const legalLinks = [
-  { label: "Terms of Service", href: "#" },
-  { label: "Privacy Policy", href: "#" },
-  { label: "Compliance", href: "#" },
+// Each legal link maps to a LegalDocId — clicking opens the modal
+const legalLinks: { label: string; docId: LegalDocId }[] = [
+  { label: "Terms of Service", docId: "terms" },
+  { label: "Privacy Policy", docId: "privacy" },
+  { label: "Compliance", docId: "compliance" },
 ];
 
 export default function Footer() {
+  const { openDocId, triggerRefs, openModal, closeModal } = useLegalModal();
+
   return (
     <footer className="relative overflow-hidden border-t border-white/5 bg-ink-900">
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-40" />
@@ -114,13 +121,18 @@ export default function Footer() {
           </p>
           <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             {legalLinks.map((link) => (
-              <li key={link.label}>
-                <a
-                  href={link.href}
-                  className="inline-flex items-center gap-1 text-xs text-ink-400 transition-colors hover:text-brand-400"
+              <li key={link.docId}>
+                {/* Button instead of <a> — opens modal in-page */}
+                <button
+                  type="button"
+                  ref={(el) => {
+                    triggerRefs.current[link.docId] = el;
+                  }}
+                  onClick={() => openModal(link.docId)}
+                  className="text-xs text-ink-400 transition-colors hover:text-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                 >
                   {link.label}
-                </a>
+                </button>
               </li>
             ))}
             <li>
@@ -135,6 +147,9 @@ export default function Footer() {
           </ul>
         </div>
       </Container>
+
+      {/* Legal modal — rendered here, floats above page via fixed positioning */}
+      <LegalModal docId={openDocId} onClose={closeModal} />
     </footer>
   );
 }

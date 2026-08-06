@@ -919,6 +919,9 @@ export default function AdminPage() {
                           </td>
                           <td className="px-3 py-2.5 text-right">
                             <input
+                              id={`quoting-price-${l.id}`}
+                              name={`quoting_price_${l.id}`}
+                              aria-label={`Quoting price for line item ${l.id}`}
                               type="number"
                               step="0.01"
                               min="0"

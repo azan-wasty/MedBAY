@@ -28,7 +28,7 @@ function Reveal({
   once?: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
-  const MotionTag = motion(as as any);
+  const MotionTag = motion.create(as as any);
 
   return (
     <MotionTag

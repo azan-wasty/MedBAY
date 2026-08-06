@@ -1060,6 +1060,9 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <input
+                            id={`counter-target-price-${l.id}`}
+                            name={`counter_target_price_${l.id}`}
+                            aria-label={`Counter target unit price for ${l.product_name}`}
                             type="number"
                             step="0.01"
                             min="0"

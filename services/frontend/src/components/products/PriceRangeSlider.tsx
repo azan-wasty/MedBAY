@@ -99,6 +99,8 @@ export function PriceRangeSlider({
 
         {/* Lower thumb */}
         <input
+          id="min-price-range"
+          name="min_price_range"
           type="range"
           min={min}
           max={max}
@@ -135,6 +137,8 @@ export function PriceRangeSlider({
 
         {/* Upper thumb */}
         <input
+          id="max-price-range"
+          name="max_price_range"
           type="range"
           min={min}
           max={max}
@@ -177,6 +181,8 @@ export function PriceRangeSlider({
             $
           </span>
           <input
+            id="min-price-input"
+            name="min_price"
             ref={loRef}
             type="text"
             inputMode="numeric"
@@ -197,6 +203,8 @@ export function PriceRangeSlider({
             $
           </span>
           <input
+            id="max-price-input"
+            name="max_price"
             ref={hiRef}
             type="text"
             inputMode="numeric"

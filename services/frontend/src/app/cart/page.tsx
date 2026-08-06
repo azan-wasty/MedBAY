@@ -308,6 +308,8 @@ export default function CartPage() {
                       <div className="flex items-center gap-1.5 rounded-md border border-ink-200 bg-white px-2.5 py-1.5 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100">
                         <span className="text-xs text-ink-400">$</span>
                         <input
+                          id={`target-price-${item.id}`}
+                          name={`target_price_${item.id}`}
                           type="number"
                           min="0"
                           step="0.01"
@@ -371,6 +373,7 @@ export default function CartPage() {
                 </label>
                 <textarea
                   id="buyer-notes"
+                  name="buyer_notes"
                   rows={3}
                   placeholder="E.g. Required by Aug 15 · requesting 10% volume discount for quarterly contract..."
                   value={buyerNotes}
