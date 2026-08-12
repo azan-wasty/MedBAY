@@ -1,0 +1,16 @@
+[build]
+  # Build command for the Next.js frontend
+  command = "npm run build"
+
+  # Netlify Next.js runtime reads from .next directory
+  publish = ".next"
+
+[build.environment]
+  # Pin to Node 20 (matches the Dockerfile's node:20-alpine base)
+  NODE_VERSION = "20"
+
+# Netlify Next.js SSR runtime — handles API routes as serverless functions
+# This plugin is automatically installed by Netlify when it detects Next.js.
+# Listing it here makes the config explicit and reproducible.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

@@ -65,6 +65,26 @@ class ResPartnerVerification(models.Model):
 
         res = super(ResPartnerVerification, self).write(vals)
 
+        # Cascade verification status changes from parent company to all child contact partners
+        if 'verification_status' in vals or 'is_verified' in vals:
+            cascade_vals = {}
+            if 'verification_status' in vals:
+                cascade_vals['verification_status'] = vals['verification_status']
+            if 'is_verified' in vals:
+                cascade_vals['is_verified'] = vals['is_verified']
+            if 'verified_by' in vals:
+                cascade_vals['verified_by'] = vals['verified_by']
+            if 'verification_date' in vals:
+                cascade_vals['verification_date'] = vals['verification_date']
+
+            for partner in self:
+                if partner.is_company and partner.child_ids:
+                    children_to_update = partner.child_ids.filtered(
+                        lambda c: c.verification_status != vals.get('verification_status')
+                    )
+                    if children_to_update:
+                        children_to_update.sudo().with_context(tracking_disable=True).write(cascade_vals)
+
         # Send approval email to each newly-verified company partner.
         if newly_verified:
             template = self.env.ref(
@@ -79,11 +99,17 @@ class ResPartnerVerification(models.Model):
             else:
                 for partner in newly_verified:
                     if partner.email:
-                        template.sudo().send_mail(partner.id, force_send=True)
-                        _logger.info(
-                            "Sent verification approval email for partner %s (%s)",
-                            partner.name, partner.email,
-                        )
+                        try:
+                            template.sudo().send_mail(partner.id, force_send=False)
+                            _logger.info(
+                                "Queued verification approval email for partner %s (%s)",
+                                partner.name, partner.email,
+                            )
+                        except Exception as e:
+                            _logger.warning(
+                                "Skipped verification email for partner %s (SMTP not configured): %s",
+                                partner.name, str(e),
+                            )
                     else:
                         _logger.warning(
                             "Partner %s has no email — skipping verification notification.",

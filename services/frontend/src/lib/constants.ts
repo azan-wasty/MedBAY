@@ -92,16 +92,23 @@ export const CART_LABELS = {
 
 export const DASHBOARD_LABELS = {
   title: "Procurement Dashboard",
-  subtitle: "Track your RFQs, verify licensing status, and manage quotations.",
+  subtitle: "Track your quotations, manage orders, and verify licensing status.",
   companyInfo: "Organization Profile",
   statusVerified: "Verified",
   statusUnverified: "Pending Verification",
-  rfqListTitle: "Your Requests for Quote",
-  noRfqs: "No RFQs submitted yet. Browse the catalog to create your first quote request.",
+  quotationsTitle: "Quotations",
+  ordersTitle: "My Orders",
+  noQuotations: "No quotations yet. Browse the catalog to submit your first RFQ.",
+  noOrders: "No confirmed orders yet. Accept a quotation to place your first order.",
   tableId: "Reference",
-  tableDate: "Date",
-  tableTotal: "Est. Total",
+  tableDate: "Date Requested",
+  tableOrderDate: "Date Confirmed",
+  tableTotal: "Est. Value",
+  tableOrderTotal: "Order Total",
   tableStatus: "Status",
+  // Legacy — kept for backward compatibility
+  rfqListTitle: "Quotations",
+  noRfqs: "No quotations yet. Browse the catalog to submit your first RFQ.",
 };
 
 export const ODOO_STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
@@ -145,9 +152,9 @@ export const QUOTATION_STATE_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
 };
 export const RFQ_NEGOTIATION_LABELS = {
-  approveBtn: "Approve & Order",
+  approveBtn: "Accept Order",
   counterBtn: "Counter Offer",
-  rejectBtn: "Reject Quote",
+  rejectBtn: "Reject Quotation",
   rejectionModalTitle: "Reject Quotation",
   rejectionReasonPlaceholder: "Optional reason for rejection (e.g. price above budget, timeline too long)...",
   confirmRejectBtn: "Confirm Rejection",
@@ -248,19 +255,20 @@ export const ADMIN_OVERVIEW_LABELS = {
   topProductRevenueHeader: "Revenue",
 };
 export const BUYER_OVERVIEW_LABELS = {
-  title: "Procurement & RFQ Insights",
-  subtitle: "A real-time overview of your requested quotations, active orders, and procurement volume.",
-  totalRfqs: "Total RFQs Submitted",
+  title: "Procurement Insights",
+  subtitle: "A real-time overview of your quotations, confirmed orders, and procurement volume.",
+  totalRfqs: "Total Quotations",
   readyForApproval: "Action Required",
-  quotesToApprove: "quotes awaiting your approval",
+  quotesToApprove: "quotations awaiting your decision",
   confirmedOrders: "Confirmed Orders",
   activeProcurement: "in fulfillment pipeline",
-  totalSpend: "Total Quoted Value",
-  statusChartTitle: "RFQ Status Breakdown",
+  totalSpend: "Total Order Value",
+  totalSpendSub: "quoted pipeline value",
+  statusChartTitle: "Quotation Status Breakdown",
   spendChartTitle: "Order Value History ($)",
-  quickActionsTitle: "Procurement Shortcuts",
+  quickActionsTitle: "Quick Actions",
   noRfqData: "No quotation history available.",
-  noSpendData: "No spend history available.",
+  noSpendData: "No order history available.",
 };
 export const ADMIN_RETURNS_LABELS = {
   filterAll: "All",
@@ -517,8 +525,8 @@ export const MOCK_PRODUCTS = [
     vendor_id: [9101, "Aura Medical Systems"] as [number, string],
     stock_status: "in_stock" as const,
     low_stock_threshold: 2,
-    marketplace_published: true,
-    marketplace_featured: true,
+    marketplace_published: false,
+    marketplace_featured: false,
     featured_sequence: 1,
     attribute_line_ids: [] as number[],
   },
@@ -538,8 +546,8 @@ export const MOCK_PRODUCTS = [
     stock_status: "low_stock" as const,
     low_stock_threshold: 5,
     qty_available: 3,
-    marketplace_published: true,
-    marketplace_featured: true,
+    marketplace_published: false,
+    marketplace_featured: false,
     featured_sequence: 2,
     attribute_line_ids: [] as number[],
   },
@@ -559,6 +567,8 @@ export const MOCK_PRODUCTS = [
     stock_status: "out_of_stock" as const,
     low_stock_threshold: 3,
     qty_available: 0,
+    marketplace_published: false,
+    marketplace_featured: false,
     attribute_line_ids: [] as number[],
   },
   {
@@ -577,6 +587,8 @@ export const MOCK_PRODUCTS = [
     stock_status: "in_stock" as const,
     low_stock_threshold: 10,
     qty_available: 28,
+    marketplace_published: false,
+    marketplace_featured: false,
     attribute_line_ids: [] as number[],
   },
   {
@@ -595,6 +607,8 @@ export const MOCK_PRODUCTS = [
     stock_status: "in_stock" as const,
     low_stock_threshold: 3,
     qty_available: 9,
+    marketplace_published: false,
+    marketplace_featured: false,
     attribute_line_ids: [] as number[],
   },
   // The two products below have real attribute_lines/variants, unlike the
@@ -617,6 +631,8 @@ export const MOCK_PRODUCTS = [
     stock_status: "in_stock" as const,
     low_stock_threshold: 100,
     qty_available: 2280,
+    marketplace_published: false,
+    marketplace_featured: false,
     attribute_line_ids: [9001, 9004],
     attribute_lines: [
       {
@@ -667,6 +683,8 @@ export const MOCK_PRODUCTS = [
     stock_status: "in_stock" as const,
     low_stock_threshold: 50,
     qty_available: 1840,
+    marketplace_published: false,
+    marketplace_featured: false,  
     attribute_line_ids: [9003, 9002],
     attribute_lines: [
       {

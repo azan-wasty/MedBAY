@@ -49,7 +49,7 @@ export function HeroProductCard({
     ? (product.vendor_id[1] as string)
     : null;
 
-  const imageSrc = getProductImageSrc(product.image_1920 || product.image_256);
+  const imageSrc = getProductImageSrc(product.image_1920 || product.image_256, categoryName || undefined);
 
   const stockConfig = product.stock_status
     ? STOCK_STATUS_MAP[product.stock_status]

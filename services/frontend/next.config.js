@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
   compress: true,
-  swcMinify: true,
   experimental: {
     optimizePackageImports: [
       'lucide-react',
@@ -50,4 +48,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-

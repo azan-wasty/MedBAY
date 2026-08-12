@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
-import { Minus, Plus, Trash2, ArrowRight, Loader2, PackageCheck, ShoppingCart, MessageSquare } from 'lucide-react';
+import { Minus, Plus, Trash2, ArrowRight, Loader2, PackageCheck, ShoppingCart, MessageSquare, Tag } from 'lucide-react';
 
 import { CART_LABELS, AUTH_LABELS } from '@/lib/constants';
 import { Container } from '@/components/shared/Container';
@@ -14,6 +14,12 @@ import { Alert } from '@/components/ui/alert';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter,
 } from '@/components/ui/dialog';
+
+interface PriceBreak {
+  min_qty: number;
+  price: number;
+  discount_pct: number;
+}
 
 interface CartItem {
   id: number;
@@ -25,6 +31,21 @@ interface CartItem {
   targetPrice?: number;
 }
 
+/** Pick the best price break for a given quantity. */
+function effectivePrice(breaks: PriceBreak[] | undefined, qty: number, fallback: number): number {
+  if (!breaks || breaks.length === 0) return fallback;
+  const sorted = [...breaks].sort((a, b) => b.min_qty - a.min_qty);
+  const match = sorted.find((b) => qty >= b.min_qty);
+  return match ? match.price : fallback;
+}
+
+function activeBulkBreak(breaks: PriceBreak[] | undefined, qty: number): PriceBreak | null {
+  if (!breaks || breaks.length === 0) return null;
+  const sorted = [...breaks].sort((a, b) => b.min_qty - a.min_qty);
+  const match = sorted.find((b) => qty >= b.min_qty && b.discount_pct > 0);
+  return match ?? null;
+}
+
 const alertVariants: Variants = {
   hidden: { opacity: 0, y: -8, scale: 0.98 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2 } },
@@ -34,6 +55,7 @@ const alertVariants: Variants = {
 export default function CartPage() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [pricingMap, setPricingMap] = useState<Record<number, PriceBreak[]>>({});
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
@@ -41,6 +63,25 @@ export default function CartPage() {
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [buyerNotes, setBuyerNotes] = useState<string>('');
   const [showUnverifiedModal, setShowUnverifiedModal] = useState<boolean>(false);
+
+  /** Fetch bulk pricing tiers for a list of product ids we don't have yet. */
+  const fetchPricing = useCallback(async (items: CartItem[]) => {
+    const ids = [...new Set(items.map((i) => i.id))];
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        fetch(`/api/products/${id}/pricing`)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)
+      )
+    );
+    const map: Record<number, PriceBreak[]> = {};
+    results.forEach((res, i) => {
+      if (res.status === 'fulfilled' && res.value?.price_breaks) {
+        map[ids[i]] = res.value.price_breaks as PriceBreak[];
+      }
+    });
+    setPricingMap((prev: Record<number, PriceBreak[]>) => ({ ...prev, ...map }));
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('med_user');
@@ -50,7 +91,10 @@ export default function CartPage() {
       const storedCart = localStorage.getItem('med_cart');
       if (storedCart) {
         try {
-          setCartItems(JSON.parse(storedCart));
+          const items: CartItem[] = JSON.parse(storedCart);
+          setCartItems(items);
+          // Fetch bulk pricing tiers for all cart items immediately
+          if (items.length > 0) fetchPricing(items);
         } catch {
           setCartItems([]);
         }
@@ -58,7 +102,7 @@ export default function CartPage() {
     };
 
     loadCart();
-  }, []);
+  }, [fetchPricing]);
 
   const handleUpdateQty = (itemId: number, newQty: number) => {
     const updated = cartItems.map((item) => {
@@ -246,10 +290,10 @@ export default function CartPage() {
               </div>
 
               {/* Column headers */}
-              <div className="hidden grid-cols-[1fr_auto_120px_140px_36px] items-center gap-3 border-b border-ink-100 bg-ink-50/60 px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400 sm:grid">
+              <div className="hidden grid-cols-[1fr_auto_140px_140px_36px] items-center gap-3 border-b border-ink-100 bg-ink-50/60 px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400 sm:grid">
                 <span>Product</span>
                 <span className="text-center">Qty</span>
-                <span className="text-right">List Price</span>
+                <span className="text-right">Unit Price</span>
                 <span className="text-center">Your Target Price</span>
                 <span />
               </div>
@@ -264,7 +308,7 @@ export default function CartPage() {
                       exit={{ opacity: 0, x: 12, height: 0, transition: { duration: 0.2 } }}
                       transition={{ duration: 0.25 }}
                       layout
-                      className="flex flex-col gap-3 border-b border-ink-100 px-5 py-4 last:border-b-0 sm:grid sm:grid-cols-[1fr_auto_120px_140px_36px] sm:items-center sm:gap-3"
+                      className="flex flex-col gap-3 border-b border-ink-100 px-5 py-4 last:border-b-0 sm:grid sm:grid-cols-[1fr_auto_140px_140px_36px] sm:items-center sm:gap-3"
                     >
                       {/* Name */}
                       <div className="min-w-0">
@@ -277,12 +321,38 @@ export default function CartPage() {
                         {item.variantLabel && <p className="mt-0.5 text-xs text-ink-500">{item.variantLabel}</p>}
                       </div>
 
-                      {/* List price */}
+                      {/* Unit price — updates live when qty hits a bulk threshold */}
                       <div className="text-right">
-                        <span className="font-data text-[13px] font-semibold text-ink-700">
-                          ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </span>
-                        <p className="text-[10px] text-ink-400">per unit</p>
+                        {(() => {
+                          const breaks = pricingMap[item.id];
+                          const unitPrice = effectivePrice(breaks, item.quantity, item.price);
+                          const bulkBreak = activeBulkBreak(breaks, item.quantity);
+                          const isDiscounted = bulkBreak !== null;
+                          return (
+                            <>
+                              <div className="flex items-center justify-end gap-1.5">
+                                {isDiscounted && (
+                                  <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                    <Tag className="h-2.5 w-2.5" />
+                                    -{bulkBreak!.discount_pct}%
+                                  </span>
+                                )}
+                                <span className={`font-data text-[13px] font-semibold ${
+                                  isDiscounted ? 'text-emerald-700' : 'text-ink-700'
+                                }`}>
+                                  ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              {isDiscounted ? (
+                                <p className="text-[10px] text-ink-400 line-through">
+                                  ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </p>
+                              ) : (
+                                <p className="text-[10px] text-ink-400">per unit</p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {/* Qty stepper */}
@@ -355,9 +425,12 @@ export default function CartPage() {
                   <strong className="font-medium text-ink-900">{totalItems}</strong>
                 </div>
                 <div className="flex items-center justify-between border-t border-ink-100 pt-2 text-[13px]">
-                  <span className="text-ink-500">Est. List Value</span>
-                  <strong className="font-data font-semibold text-ink-900">
-                    ${cartItems.reduce((acc, i) => acc + i.price * i.quantity, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  <span className="text-ink-500">Est. Value (with discounts)</span>
+                  <strong className="font-data font-semibold text-emerald-700">
+                    ${cartItems.reduce((acc: number, i: CartItem) => {
+                      const unitPrice = effectivePrice(pricingMap[i.id], i.quantity, i.price);
+                      return acc + unitPrice * i.quantity;
+                    }, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </strong>
                 </div>
               </div>

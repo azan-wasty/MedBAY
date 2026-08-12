@@ -91,6 +91,17 @@ class MedicalMarketplaceController(http.Controller):
             return self._json_response({'error': 'Forbidden: admin access required'}, status=403)
         return None
 
+    def _get_effective_verification_status(self, partner):
+        """Return verification status of partner or fallback to parent company verification status."""
+        if not partner:
+            return 'pending'
+        status = partner.verification_status
+        if status in ('verified', 'rejected'):
+            return status
+        if partner.parent_id and partner.parent_id.verification_status:
+            return partner.parent_id.verification_status
+        return status or 'pending'
+
     def _get_config_param(self, key, default=''):
         """Read a value from ir.config_parameter at runtime (never hardcoded)."""
         return request.env['ir.config_parameter'].sudo().get_param(key, default)
@@ -127,14 +138,19 @@ class MedicalMarketplaceController(http.Controller):
             outgoing = pickings.filtered(
                 lambda p: p.picking_type_id.code == 'outgoing'
             ) if hasattr(order, 'picking_ids') else request.env['stock.picking']
+
+            # Stage 4 & 5: Delivered or Completed
             if outgoing and all(p.state == 'done' for p in outgoing):
-                # All outgoing pickings done — check if invoice is paid
                 invoices = getattr(order, 'invoice_ids', request.env['account.move']).filtered(lambda i: i.state == 'posted')
                 if any(i.payment_state in ('paid', 'in_payment') for i in invoices):
                     return 'completed'
                 return 'delivered'
-            if outgoing and any(p.state in ('confirmed', 'assigned') for p in outgoing):
+
+            # Stage 3: Out for Delivery (when tracking reference / carrier tracking is attached)
+            if order.tracking_reference or (outgoing and any(getattr(p, 'carrier_tracking_ref', False) for p in outgoing)):
                 return 'out_for_delivery'
+
+            # Stage 2: Processing (Order confirmed by buyer/admin, preparing in warehouse)
             return 'processing'
 
         return 'ordered'
@@ -776,20 +792,35 @@ class MedicalMarketplaceController(http.Controller):
             if existing_user:
                 return self._json_response({'error': 'Email already registered'}, status=400)
 
-            company = request.env['res.partner'].sudo().create({
+            company = request.env['res.partner'].sudo().with_context(
+                mail_create_nosubscribe=True,
+                mail_create_nolog=True,
+                tracking_disable=True
+            ).create({
                 'name': name,
                 'is_company': True,
                 'registration_number': registration_number,
                 'email': email,
             })
 
-            user = request.env['res.users'].sudo().create({
+            user = request.env['res.users'].sudo().with_context(
+                no_reset_password=True,
+                signup_force_type_in_url=True,
+                mail_create_nosubscribe=True,
+                mail_create_nolog=True,
+                tracking_disable=True
+            ).create({
                 'name': name,
                 'login': email,
                 'password': password,
-                'partner_id': company.id,
                 'groups_id': [(6, 0, [request.env.ref('base.group_portal').id])]
             })
+
+            if user.partner_id:
+                user.partner_id.sudo().with_context(tracking_disable=True).write({
+                    'parent_id': company.id,
+                    'registration_number': registration_number,
+                })
 
             return self._json_response({
                 'success': True,
@@ -829,6 +860,7 @@ class MedicalMarketplaceController(http.Controller):
                 else:
                     clean_name = user.login.split('@')[0].capitalize() if user.login else 'Organization'
 
+            v_status = self._get_effective_verification_status(user.partner_id)
             return self._json_response({
                 'success': True,
                 'session_id': request.session.sid,
@@ -838,7 +870,7 @@ class MedicalMarketplaceController(http.Controller):
                     'email': user.login,
                     'partner_id': user.partner_id.id,
                     'is_admin': self._is_admin(),
-                    'verification_status': user.partner_id.verification_status,
+                    'verification_status': v_status,
                 }
             })
 
@@ -851,13 +883,14 @@ class MedicalMarketplaceController(http.Controller):
         if resp := self._require_user():
             return resp
         user = request.env.user
+        v_status = self._get_effective_verification_status(user.partner_id)
         return self._json_response({
             'sid': request.session.sid,
             'uid': request.session.uid,
             'db': request.session.db,
             'login': user.login,
             'is_admin': self._is_admin(),
-            'verification_status': user.partner_id.verification_status,
+            'verification_status': v_status,
         })
 
     # ------------------------------------------------------------------
@@ -873,10 +906,11 @@ class MedicalMarketplaceController(http.Controller):
             require_verification = self._get_config_param(
                 'medical_marketplace.require_verification_for_rfq', 'True'
             ) == 'True'
-            if require_verification and partner.verification_status != 'verified':
+            v_status = self._get_effective_verification_status(partner)
+            if require_verification and v_status != 'verified':
                 return self._json_response(
                     {'error': 'Your company must be verified before submitting RFQs.',
-                     'verification_status': partner.verification_status},
+                     'verification_status': v_status},
                     status=403
                 )
 
@@ -1329,7 +1363,8 @@ class MedicalMarketplaceController(http.Controller):
         if not partner.exists():
             return self._json_response({'error': 'Company not found'}, status=404)
 
-        partner.write({
+        targets = partner | partner.child_ids
+        targets.write({
             'verification_status': 'verified',
             'verified_by': request.env.user.id,
             'verification_date': fields.Datetime.now(),
@@ -1350,7 +1385,8 @@ class MedicalMarketplaceController(http.Controller):
         if not partner.exists():
             return self._json_response({'error': 'Company not found'}, status=404)
 
-        partner.write({
+        targets = partner | partner.child_ids
+        targets.write({
             'verification_status': 'rejected',
             'verified_by': request.env.user.id,
             'verification_date': fields.Datetime.now(),
@@ -1440,7 +1476,7 @@ class MedicalMarketplaceController(http.Controller):
 
     @http.route('/api/admin/rfq/<int:order_id>/quote', type='http', auth='user', methods=['POST'], csrf=False)
     def admin_quote_rfq(self, order_id, **kwargs):
-        """Set line prices and move RFQ from draft to sent (triggers email notification)."""
+        """Set line prices and move RFQ from draft → sent."""
         if resp := self._require_admin():
             return resp
 
@@ -1450,12 +1486,22 @@ class MedicalMarketplaceController(http.Controller):
             if not order.exists():
                 return self._json_response({'error': 'RFQ not found'}, status=404)
 
+            # Context flags suppress mail sending & chatter tracking to avoid 500 errors when no SMTP server is set up
+            order_ctx = order.sudo().with_context(
+                mail_create_nosubscribe=True,
+                mail_create_nolog=True,
+                mail_notrack=True,
+                tracking_disable=True
+            )
+
+            # Update line prices first
             for line_update in body.get('lines', []):
                 line = request.env['sale.order.line'].sudo().browse(line_update.get('line_id'))
                 if line.exists() and line.order_id.id == order.id:
                     line.write({'price_unit': line_update.get('price_unit', line.price_unit)})
 
-            order.write({
+            # Safely transition state to 'sent' without triggering mail delivery failures
+            order_ctx.write({
                 'state': 'sent',
                 'last_counter_by': 'seller',
             })

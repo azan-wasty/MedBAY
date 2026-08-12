@@ -381,10 +381,10 @@ export const odooClient = {
       throw new Error(`Odoo login failed: [${res.status}] ${data.error ?? 'Unknown error'}`);
     }
 
-    const realSessionId = extractSessionIdFromSetCookie(rawSetCookie);
+    const realSessionId = extractSessionIdFromSetCookie(rawSetCookie) || data.session_id;
     if (!realSessionId) {
       throw new Error(
-        'Odoo login succeeded but no session_id cookie was present in the response headers.'
+        'Odoo login succeeded but no session_id cookie or token was present in response.'
       );
     }
 

@@ -101,8 +101,11 @@ class SaleOrder(models.Model):
                 self.partner_id.name, self.name,
             )
             return
-        template.sudo().send_mail(self.id, force_send=True)
-        _logger.info("Sent RFQ-quoted notification for %s to %s", self.name, self.partner_id.email)
+        try:
+            template.sudo().send_mail(self.id, force_send=False)
+            _logger.info("Queued RFQ-quoted notification for %s to %s", self.name, self.partner_id.email)
+        except Exception as e:
+            _logger.warning("Skipped RFQ email notification for %s (SMTP not configured): %s", self.name, str(e))
 
 
 class SaleOrderLine(models.Model):

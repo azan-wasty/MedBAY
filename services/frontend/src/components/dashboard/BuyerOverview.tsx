@@ -36,6 +36,7 @@ function KpiCard({
   subTone = 'neutral',
   delay = 0,
   onClick,
+  href,
 }: {
   icon: React.ElementType;
   value: React.ReactNode;
@@ -44,18 +45,15 @@ function KpiCard({
   subTone?: 'neutral' | 'warning' | 'positive' | 'brand';
   delay?: number;
   onClick?: () => void;
+  href?: string;
 }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay, ease: [0.4, 0, 0.2, 1] }}
-      onClick={onClick}
-      className={cn(
-        'rounded-xl border border-ink-100 bg-white p-5 shadow-soft-xs text-left transition-all',
-        onClick && 'cursor-pointer hover:border-brand-300 hover:shadow-soft-sm'
-      )}
-    >
+  const classes = cn(
+    'rounded-xl border border-ink-100 bg-white p-5 shadow-soft-xs text-left transition-all',
+    (onClick || href) && 'cursor-pointer hover:border-brand-300 hover:shadow-soft-sm hover:-translate-y-0.5'
+  );
+
+  const inner = (
+    <>
       <div className="flex items-center justify-between">
         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
           <Icon className="h-4.5 w-4.5" strokeWidth={1.75} />
@@ -76,6 +74,32 @@ function KpiCard({
       </div>
       <div className="mt-3 font-display text-[1.7rem] font-semibold leading-none text-ink-900">{value}</div>
       <div className="mt-1 text-[12.5px] font-medium text-ink-500">{label}</div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay, ease: [0.4, 0, 0.2, 1] }}
+      >
+        <a href={href} className={classes}>
+          {inner}
+        </a>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay, ease: [0.4, 0, 0.2, 1] }}
+      onClick={onClick}
+      className={classes}
+    >
+      {inner}
     </motion.div>
   );
 }
@@ -135,9 +159,9 @@ export function BuyerOverview({
   const statusData = useMemo(() => {
     return [
       { name: 'Quoted (Ready)', count: stats.sent, color: COLORS.sent },
-      { name: 'Under Review', count: stats.draft, color: COLORS.draft },
-      { name: 'Confirmed', count: stats.confirmed, color: COLORS.sale },
-      { name: 'Cancelled', count: stats.cancelled, color: COLORS.cancel },
+      { name: 'Pending Review', count: stats.draft, color: COLORS.draft },
+      { name: 'Orders', count: stats.confirmed, color: COLORS.sale },
+      { name: 'Rejected', count: stats.cancelled, color: COLORS.cancel },
     ];
   }, [stats]);
 
@@ -190,15 +214,16 @@ export function BuyerOverview({
           icon={FileText}
           value={stats.total}
           label={BUYER_OVERVIEW_LABELS.totalRfqs}
-          subStat={stats.draft > 0 ? `${stats.draft} under review` : undefined}
+          subStat={stats.draft > 0 ? `${stats.draft} pending review` : undefined}
           subTone="neutral"
           delay={0}
+          href="#rfq-list"
         />
         <KpiCard
           icon={CheckCircle2}
           value={stats.sent}
           label={BUYER_OVERVIEW_LABELS.readyForApproval}
-          subStat={stats.sent > 0 ? BUYER_OVERVIEW_LABELS.quotesToApprove : 'All quotes up to date'}
+          subStat={stats.sent > 0 ? BUYER_OVERVIEW_LABELS.quotesToApprove : 'All up to date'}
           subTone={stats.sent > 0 ? 'warning' : 'positive'}
           delay={0.05}
           onClick={stats.sentQuotes.length > 0 && onSelectRFQ ? () => onSelectRFQ(stats.sentQuotes[0]) : undefined}
@@ -210,14 +235,16 @@ export function BuyerOverview({
           subStat={stats.confirmed > 0 ? BUYER_OVERVIEW_LABELS.activeProcurement : undefined}
           subTone="positive"
           delay={0.1}
+          href="#orders-list"
         />
         <KpiCard
           icon={DollarSign}
-          value={stats.totalQuotedValue > 0 ? formatCurrency(stats.totalQuotedValue) : '$0.00'}
+          value={stats.confirmedValue > 0 ? formatCurrency(stats.confirmedValue) : '$0.00'}
           label={BUYER_OVERVIEW_LABELS.totalSpend}
-          subStat={stats.confirmedValue > 0 ? `${formatCurrency(stats.confirmedValue)} ordered` : undefined}
+          subStat={stats.totalQuotedValue > 0 ? `${formatCurrency(stats.totalQuotedValue)} ${BUYER_OVERVIEW_LABELS.totalSpendSub}` : undefined}
           subTone="brand"
           delay={0.15}
+          href="#orders-list"
         />
       </div>
 
@@ -311,7 +338,7 @@ export function BuyerOverview({
                 <span>Request Return</span>
               </Link>
               <Link
-                href="/faq"
+                href="/#faq"
                 className="flex items-center gap-2 rounded-lg border border-ink-100 bg-ink-50/50 p-2.5 text-[12.5px] font-medium text-ink-700 transition-colors hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-800"
               >
                 <HelpCircle className="h-4 w-4 text-brand-700" />

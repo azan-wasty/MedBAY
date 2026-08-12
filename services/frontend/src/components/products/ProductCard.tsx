@@ -22,8 +22,8 @@ export const ProductCard = React.memo(function ProductCard({
   index?: number;
   onAddToCart: (product: Product, e: React.MouseEvent) => void;
 }) {
-  const categoryName = Array.isArray(product.categ_id) ? product.categ_id[1] : product.categ_id;
-  const imageSrc = getProductImageSrc(product.image_256);
+  const categoryName = Array.isArray(product.categ_id) ? product.categ_id[1] : (typeof product.categ_id === 'string' ? product.categ_id : undefined);
+  const imageSrc = getProductImageSrc(product.image_256, categoryName);
   const isOutOfStock = product.stock_status === "out_of_stock";
   const hasVariants = Boolean(product.attribute_line_ids && product.attribute_line_ids.length > 0);
   const stockConfig = product.stock_status ? STOCK_STATUS_MAP[product.stock_status] : undefined;
