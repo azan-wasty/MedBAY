@@ -89,12 +89,16 @@ export default function Navbar() {
     localStorage.removeItem("med_user");
     localStorage.removeItem("med_session");
     window.dispatchEvent(new Event("auth-updated"));
-    await fetch("/api/auth/login", { method: "DELETE" }).catch(() => {});
+    await fetch("/api/auth/login", { method: "DELETE" }).catch(() => { });
     router.push("/");
     router.refresh();
   };
 
   const visibleLinks = NAV_LINKS.filter((link) => {
+    if (user?.is_admin) {
+      // Admins only see the Admin link — buyer-facing nav is hidden.
+      return link.path === "/admin";
+    }
     if (link.path === "/dashboard" && !user) return false;
     if (link.path === "/returns" && !user) return false;
     if (link.path === "/admin" && !user?.is_admin) return false;

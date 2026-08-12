@@ -14,6 +14,7 @@ import {
   Bell,
   Trash2,
   Package,
+  Landmark,
 } from 'lucide-react';
 
 import {
@@ -21,7 +22,7 @@ import {
   TRACKING_LABELS, REVIEW_LABELS, RFQ_NEGOTIATION_LABELS,
 } from '@/lib/constants';
 import type { RFQItem, User, RFQDetail, OrderTracking } from '@/lib/odooClient';
-import { formatDisplayName } from '@/lib/utils';
+import { formatDisplayName, cn } from '@/lib/utils';
 import { Container } from '@/components/shared/Container';
 import { OrderStepper } from '@/components/dashboard/OrderStepper';
 import { BuyerOverview } from '@/components/dashboard/BuyerOverview';
@@ -509,8 +510,8 @@ export default function DashboardPage() {
 
         {user && user.verification_status !== 'verified' && (
           <div className={`mb-6 rounded-xl border p-4 text-sm leading-relaxed shadow-soft-xs ${user.verification_status === 'rejected'
-              ? 'border-red-200 bg-red-50/80 text-red-900'
-              : 'border-amber-200 bg-amber-50/80 text-amber-900'
+            ? 'border-red-200 bg-red-50/80 text-red-900'
+            : 'border-amber-200 bg-amber-50/80 text-amber-900'
             }`}>
             <p className="font-semibold">
               {user.verification_status === 'rejected'
@@ -1039,16 +1040,47 @@ export default function DashboardPage() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {tracking.invoices.map((inv) => (
-                                          <tr key={inv.id} className="border-b border-ink-100 bg-white last:border-b-0">
-                                            <td className="px-3 py-2 font-medium text-ink-900">{inv.name}</td>
-                                            <td className="px-3 py-2 capitalize text-ink-600">{inv.state}</td>
-                                            <td className="px-3 py-2 capitalize text-ink-600">{inv.payment_state?.replace(/_/g, ' ')}</td>
-                                            <td className="px-3 py-2 text-right font-medium text-ink-900">
-                                              ${inv.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </td>
-                                          </tr>
-                                        ))}
+                                        {tracking.invoices.map((inv) => {
+                                          const isUnpaid = inv.payment_state === 'not_paid' || inv.payment_state === 'partial';
+                                          const showBankInfo = isUnpaid && inv.recipient_bank && (
+                                            inv.recipient_bank.account_number || inv.recipient_bank.bank_name
+                                          );
+                                          return (
+                                            <React.Fragment key={inv.id}>
+                                              <tr className={cn('bg-white', !showBankInfo && 'border-b border-ink-100 last:border-b-0')}>
+                                                <td className="px-3 py-2 font-medium text-ink-900">{inv.name}</td>
+                                                <td className="px-3 py-2 capitalize text-ink-600">{inv.state}</td>
+                                                <td className="px-3 py-2 capitalize text-ink-600">{inv.payment_state?.replace(/_/g, ' ')}</td>
+                                                <td className="px-3 py-2 text-right font-medium text-ink-900">
+                                                  ${inv.amount_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </td>
+                                              </tr>
+                                              {showBankInfo && (
+                                                <tr className="border-b border-ink-100 bg-brand-50/40 last:border-b-0">
+                                                  <td colSpan={4} className="px-3 pb-3 pt-1">
+                                                    <div className="flex items-start gap-2 rounded-md border border-brand-100 bg-white px-3 py-2">
+                                                      <Landmark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-700" />
+                                                      <div className="text-[11.5px] leading-relaxed text-ink-600">
+                                                        <span className="font-semibold text-ink-800">Pay to: </span>
+                                                        {inv.recipient_bank && inv.recipient_bank.bank_name && (
+                                                          <span>{inv.recipient_bank.bank_name}</span>
+                                                        )}
+                                                        {inv.recipient_bank && inv.recipient_bank.account_holder && (
+                                                          <span> · {inv.recipient_bank.account_holder}</span>
+                                                        )}
+                                                        {inv.recipient_bank && inv.recipient_bank.account_number && (
+                                                          <span className="ml-1 font-data font-medium text-ink-800">
+                                                            {inv.recipient_bank.account_number}
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              )}
+                                            </React.Fragment>
+                                          );
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>

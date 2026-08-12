@@ -152,7 +152,7 @@ export const QUOTATION_STATE_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
 };
 export const RFQ_NEGOTIATION_LABELS = {
-  approveBtn: "Accept Order",
+  approveBtn: "Approve & Order",
   counterBtn: "Counter Offer",
   rejectBtn: "Reject Quotation",
   rejectionModalTitle: "Reject Quotation",
@@ -684,7 +684,7 @@ export const MOCK_PRODUCTS = [
     low_stock_threshold: 50,
     qty_available: 1840,
     marketplace_published: false,
-    marketplace_featured: false,  
+    marketplace_featured: false,
     attribute_line_ids: [9003, 9002],
     attribute_lines: [
       {

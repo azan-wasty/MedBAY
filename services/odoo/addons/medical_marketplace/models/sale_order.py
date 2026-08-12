@@ -65,6 +65,11 @@ class SaleOrder(models.Model):
         default=False,
         help='Indicates who last updated/countered the RFQ prices or target terms.',
     )
+    payment_method = fields.Selection(
+        [('bank_transfer', 'Bank Transfer'), ('cash', 'Cash on Delivery')],
+        string='Payment Method',
+        default=False,
+    )
 
     # ------------------------------------------------------------------
     # Existing: quotation notification (unchanged)
@@ -114,4 +119,4 @@ class SaleOrderLine(models.Model):
     target_price_unit = fields.Float(
         string='Buyer Proposed Target Price',
         help='Target unit price requested by the buyer during RFQ submission.',
-    )
+    )

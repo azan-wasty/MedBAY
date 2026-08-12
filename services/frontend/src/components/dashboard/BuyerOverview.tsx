@@ -48,7 +48,7 @@ function KpiCard({
   href?: string;
 }) {
   const classes = cn(
-    'rounded-xl border border-ink-100 bg-white p-5 shadow-soft-xs text-left transition-all',
+    'block w-full rounded-xl border border-ink-100 bg-white p-5 shadow-soft-xs text-left transition-all',
     (onClick || href) && 'cursor-pointer hover:border-brand-300 hover:shadow-soft-sm hover:-translate-y-0.5'
   );
 

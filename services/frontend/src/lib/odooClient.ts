@@ -107,6 +107,7 @@ export interface RFQItem {
   buyer_stage?: string;
   rejection_reason?: string | null;
   last_counter_by?: string | null;
+  payment_method?: 'bank_transfer' | 'cash' | null;
 }
 
 export interface RFQLine {
@@ -137,6 +138,7 @@ export interface RFQDetail {
   buyer_notes?: string | null;
   rejection_reason?: string | null;
   last_counter_by?: string | null;
+  payment_method?: 'bank_transfer' | 'cash' | null;
   lines: RFQLine[];
 }
 
@@ -150,6 +152,12 @@ export interface Picking {
   date_done: string | boolean;
 }
 
+export interface RecipientBank {
+  bank_name: string | false;
+  account_number: string | false;
+  account_holder: string | false;
+}
+
 export interface OrderInvoice {
   id: number;
   name: string;
@@ -157,6 +165,7 @@ export interface OrderInvoice {
   payment_state: string;
   amount_total: number;
   invoice_date: string | boolean;
+  recipient_bank: RecipientBank | false;
 }
 
 export interface CarrierInfo {
@@ -193,6 +202,7 @@ export interface OrderTracking {
   amount_total: number;
   date_order: string;
   buyer_stage: string;
+  payment_method: 'bank_transfer' | 'cash' | null;
   stages: OrderStage[];
   carrier: CarrierInfo | false;
   tracking_reference: string | false;
@@ -444,10 +454,11 @@ export const odooClient = {
     });
   },
 
-  async approveRFQ(id: number | string, sessionId: string) {
+  async approveRFQ(id: number | string, sessionId: string, paymentMethod: 'bank_transfer' | 'cash') {
     return this.request(`/api/rfq/${id}/approve`, {
       method: 'POST',
       headers: { Cookie: `session_id=${sessionId}` },
+      body: JSON.stringify({ payment_method: paymentMethod }),
       cache: 'no-store',
     });
   },

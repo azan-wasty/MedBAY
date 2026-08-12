@@ -1006,8 +1006,22 @@ class MedicalMarketplaceController(http.Controller):
                 ['id', 'name', 'state', 'scheduled_date', 'date_done']
             ) if hasattr(order, 'picking_ids') else []
             invoices = order.invoice_ids.sudo().read(
-                ['id', 'name', 'state', 'payment_state', 'amount_total', 'invoice_date']
+                ['id', 'name', 'state', 'payment_state', 'amount_total', 'invoice_date', 'partner_bank_id']
             ) if hasattr(order, 'invoice_ids') else []
+
+            # Enrich unpaid invoices with recipient bank info so buyers know where to wire payment.
+            for inv in invoices:
+                bank_field = inv.pop('partner_bank_id', False)
+                inv['recipient_bank'] = False
+                if bank_field:
+                    bank_id = bank_field[0] if isinstance(bank_field, (list, tuple)) else bank_field
+                    bank_record = request.env['res.partner.bank'].sudo().browse(bank_id)
+                    if bank_record.exists():
+                        inv['recipient_bank'] = {
+                            'bank_name': bank_record.bank_id.name or False,
+                            'account_number': bank_record.acc_number or False,
+                            'account_holder': bank_record.acc_holder_name or bank_record.partner_id.name or False,
+                        }
 
             # Carrier & tracking info
             carrier_info = False

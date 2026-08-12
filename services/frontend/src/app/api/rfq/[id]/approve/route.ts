@@ -14,7 +14,12 @@ export async function POST(
   }
 
   try {
-    const result = await odooClient.approveRFQ(id, session.value);
+    const body = await request.json().catch(() => ({}));
+    const paymentMethod = body?.payment_method;
+    if (paymentMethod !== 'bank_transfer' && paymentMethod !== 'cash') {
+      return NextResponse.json({ error: 'payment_method must be "bank_transfer" or "cash"' }, { status: 400 });
+    }
+    const result = await odooClient.approveRFQ(id, session.value, paymentMethod);
     return NextResponse.json(result);
   } catch (error: any) {
     console.error(`[rfq/${id}/approve] Odoo RFQ approval failed:`, error);
